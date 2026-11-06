@@ -1,0 +1,312 @@
+@page "/reservas"
+@inject ApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Reservas · Hotel Reservas</PageTitle>
+
+<div class="encabezado"><h2>Reservas</h2><span class="chip">CU-03 · CU-04 · CU-05 · CU-06 · RF16 · RF17 · RF18</span>
+    <span class="sub">Consultar disponibilidad y confirmar la reserva como una transacción completa, con el desglose de IVA y el precio neto.</span></div>
+
+<RequiereSesion>
+<div class="tarjeta">
+    <h3>0 · Huésped (CU-02, RF18 reserva rápida)</h3>
+    <div class="fila" style="margin-top:10px">
+        <div class="campo"><label for="doc">Documento del huésped</label><input id="doc" @bind="documento" placeholder="Ej. 2020202020" @onkeydown="EnterDoc" /></div>
+        <button class="btn azul" @onclick="BuscarHuesped" disabled="@ocupado">Buscar</button>
+        <button class="btn" @onclick='() => Nav.NavigateTo("huespedes")'>Registrar nuevo</button>
+    </div>
+    @if (errorHu != null) { <div class="nota error" role="alert" style="margin-top:10px">@errorHu</div> }
+    @if (huesped != null)
+    {
+        <div class="nota ok" style="margin-top:10px">
+            <b>@huesped.NombreCompleto</b> · @huesped.TipoDocumento @huesped.NumeroDocumento · @huesped.Estadias estadía(s)
+            @if (huesped.EsFrecuente && huesped.UltimaEstadia != null)
+            {
+                <span class="chip ok">Huésped frecuente</span><br />
+                <span>Última estadía: hab. @huesped.UltimaEstadia.Habitacion @huesped.UltimaEstadia.Tipo, @huesped.UltimaEstadia.Noches noche(s), @huesped.UltimaEstadia.Personas personas · pago @huesped.UltimaEstadia.MedioPago</span>
+                <div style="margin-top:8px"><button class="btn primario chico" @onclick="RepetirUltima">Repetir última estadía (1 toque)</button></div>
+            }
+            @if (huesped.ExtranjeroNoResidente) { <span class="chip">Extranjero no residente · exento de IVA</span> }
+        </div>
+    }
+</div>
+
+<div class="tarjeta">
+    <h3>1 · Consultar disponibilidad (CU-03)</h3>
+    <div class="fila" style="margin-top:10px">
+        <div class="campo" style="flex:1.5 1 210px"><label for="tipo">Tipo</label>
+            @* @key obliga a Blazor a rehacer el elemento cuando llega la lista real de tipos: si no, el navegador deja seleccionada la primera opción y la pantalla mostraría un tipo distinto del que se consulta *@
+            <select id="tipo" @key="tipos.Count" @bind="tipo" @bind:after="CambiarTipo">
+                @if (tipos.Count == 0)
+                {
+                    <option>Doble</option><option>Sencilla</option><option>Triple</option><option>Cuádruple</option>
+                }
+                else
+                {
+                    @foreach (var t in tipos)
+                    {
+                        <option value="@t.Nombre">@t.Nombre · hasta @t.Capacidad persona@(t.Capacidad > 1 ? "s" : "")</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="campo"><label for="pers">Personas</label>
+            <select id="pers" @key="MaximoPersonas" @bind="personas" @bind:after="CambiarPersonas">
+                @for (var i = 1; i <= MaximoPersonas; i++)
+                {
+                    <option value="@i">@i</option>
+                }
+            </select>
+        </div>
+        <div class="campo"><label for="ent">Entrada</label><input id="ent" type="date" @bind="entrada" @bind:after="CambiarFechas" /></div>
+        <div class="campo"><label for="sal">Salida</label><input id="sal" type="date" @bind="salida" @bind:after="CambiarFechas" /></div>
+        <button class="btn azul" @onclick="Buscar" disabled="@ocupado">Buscar habitaciones</button>
+    </div>
+    @if (avisoTipo != null) { <div class="nota info" role="status" style="margin-top:10px">@avisoTipo</div> }
+    @if (TarifaDe(tipo) is decimal tarifa && Noches > 0)
+    {
+        @* Precio estimado con la tarifa vigente del tipo: se actualiza al cambiar personas, tipo o fechas,
+           sin esperar a la consulta de disponibilidad. El valor definitivo lo calcula sp_ConfirmarReserva. *@
+        <div class="nota ok" style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap;align-items:baseline">
+            <b>@tipo · @ApiClient.Moneda(tarifa) por noche</b>
+            <span>@Noches noche@(Noches > 1 ? "s" : "") · @Personas(personas)</span>
+            <span>Subtotal @ApiClient.Moneda(tarifa * Noches)</span>
+            <span>IVA 19 % @(exento ? "exento" : ApiClient.Moneda(Math.Round(tarifa * Noches * 0.19m, 0)))</span>
+            <b style="margin-left:auto">Total @ApiClient.Moneda(exento ? tarifa * Noches : tarifa * Noches + Math.Round(tarifa * Noches * 0.19m, 0))</b>
+        </div>
+    }
+    @if (errorDisp != null) { <div class="nota error" role="alert" style="margin-top:10px">@errorDisp</div> }
+    @if (lista != null)
+    {
+        var noches = salida.DayNumber - entrada.DayNumber;
+        <p class="secundario" style="margin:12px 0 8px"><b style="color:var(--text)">@tipo · @noches noche@(noches > 1 ? "s" : "") · @Personas(personas)</b> · precios netos con IVA 19 % incluido · @lista.Count(h => h.Disponible) disponibles de @lista.Count</p>
+        <div class="habs">
+            @foreach (var h in lista)
+            {
+                <button type="button" class="hab @(h.Disponible ? "" : "off") @(sel?.IdHabitacion == h.IdHabitacion ? "sel" : "")"
+                        disabled="@(!h.Disponible)" aria-pressed="@(sel?.IdHabitacion == h.IdHabitacion)"
+                        aria-label="Habitación @h.Numero, piso @h.Piso, @h.Tipo, @(h.Disponible ? ApiClient.Moneda(h.PrecioNeto) + " por " + h.Noches + " noches" : "no disponible")"
+                        @onclick="() => Elegir(h)">
+                    <div style="display:flex;justify-content:space-between;align-items:center"><b>@h.Numero</b>
+                        <span class="chip @(h.Estado == "DISPONIBLE" ? "ok" : h.Estado == "RESERVADA" ? "naranja" : "")">@(h.Estado == "DISPONIBLE" ? "Disponible" : h.Estado == "RESERVADA" ? "Reservada" : "Mantenimiento")</span></div>
+                    <small>Piso @h.Piso · @h.Tipo · @h.Capacidad pers.</small>
+                    @if (h.Disponible) { <span class="precio">@ApiClient.Moneda(h.PrecioNeto)</span><small>neto · @h.Noches noche@(h.Noches > 1 ? "s" : "")</small> }
+                </button>
+            }
+        </div>
+        <p class="secundario" style="margin:10px 0 0">Resultado calculado en el servidor con las reservas confirmadas y en casa. Haga clic en una habitación disponible para reservarla.</p>
+    }
+</div>
+
+@if (sel != null)
+{
+    <div class="grid g21">
+        <div class="tarjeta">
+            <h3>2 · Confirmar reserva (CU-04, CU-05, CU-06)</h3>
+            @if (huesped == null)
+            {
+                <div class="nota aviso" style="margin-top:10px">Busque primero al huésped por su documento (paso 0) o regístrelo en Huéspedes.</div>
+            }
+            else
+            {
+                <div class="fila" style="margin-top:10px">
+                    <div class="campo" style="flex:2 1 220px"><label>Huésped</label><input value="@huesped.NombreCompleto" readonly /></div>
+                    <div class="campo"><label for="medio">Medio de pago</label><select id="medio" @bind="medio"><option>TARJETA</option><option>EFECTIVO</option><option>TRANSFERENCIA</option></select></div>
+                </div>
+                <label class="check" style="margin-top:12px"><input type="checkbox" @bind="exento" /><span><b>Huésped extranjero no residente</b><small>Alojamiento exento de IVA (art. 481 E.T.) · requiere pasaporte y tarjeta migratoria</small></span></label>
+                <div class="nota aviso" style="margin-top:12px">Al confirmar, el sistema verifica de nuevo que la habitación siga libre y registra en una sola operación la reserva, el pago, el comprobante y el movimiento de bitácora. Si otra persona la tomó en ese instante, no se guarda nada y se avisa.</div>
+                <div class="fila" style="margin-top:12px"><button class="btn primario" @onclick="Confirmar" disabled="@ocupado">Confirmar reserva</button><button class="btn" @onclick="() => { sel = null; }">Cancelar</button></div>
+            }
+            @if (errorConf != null) { <div class="nota error" style="margin-top:12px">@errorConf</div> }
+            @if (resultado != null)
+            {
+                <div class="nota ok" role="status" style="margin-top:12px">Reserva <b>@resultado.Codigo</b> confirmada · Comprobante <b>@resultado.Comprobante</b> · precio neto @ApiClient.Moneda(resultado.PrecioNeto)</div>
+                @if (comprobante != null)
+                {
+                    <div class="ticket" style="margin-top:12px">
+                        <h3>Comprobante @comprobante.Comprobante · compartible (RF17)</h3>
+                        <pre style="margin-top:8px">@comprobante.Texto.Replace("*", "")</pre>
+                        <div class="fila" style="margin-top:12px">
+                            @if (comprobante.EnlaceWhatsApp != null) { <a class="btn wa" href="@comprobante.EnlaceWhatsApp" target="_blank" rel="noopener">Enviar por WhatsApp · +@comprobante.Telefono</a> }
+                            <button class="btn" @onclick='() => Nav.NavigateTo("reportes")'>Ver en reportes</button>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+        <div class="tarjeta">
+            <h3>Resumen y precio neto (RF16)</h3>
+            @{ var iva = exento ? 0m : Math.Round(sel.Subtotal * 0.19m, 0); }
+            <div class="resumen" style="margin-top:10px">
+                <span class="k">Habitación</span><span class="v">@sel.Numero · @sel.Tipo</span>
+                <span class="k">Entrada → salida</span><span class="v mono">@entrada.ToString("yyyy-MM-dd") → @salida.ToString("yyyy-MM-dd")</span>
+                <span class="k">Noches × tarifa</span><span class="v">@sel.Noches × @ApiClient.Moneda(sel.TarifaNoche)</span>
+                <span class="k">Personas</span><span class="v">@personas</span>
+                <span class="k">Subtotal alojamiento</span><span class="v">@ApiClient.Moneda(sel.Subtotal)</span>
+                <span class="k">IVA 19 % @(exento ? "(exento)" : "")</span><span class="v">@ApiClient.Moneda(iva)</span>
+                <span class="k total">Precio neto</span><span class="v total">@ApiClient.Moneda(sel.Subtotal + iva)</span>
+            </div>
+        </div>
+    </div>
+}
+</RequiereSesion>
+
+@code {
+    private string documento = "", tipo = "Doble", medio = "TARJETA";
+    private int personas = 2;
+    private DateOnly entrada = DateOnly.FromDateTime(DateTime.Now).AddDays(1), salida = DateOnly.FromDateTime(DateTime.Now).AddDays(3);
+    private bool exento, ocupado;
+    private HuespedPerfil? huesped; private List<HabitacionDisponible>? lista; private HabitacionDisponible? sel;
+    private ResultadoConfirmacion? resultado; private ComprobanteCompartir? comprobante;
+    private string? errorHu, errorDisp, errorConf, avisoTipo;
+    private List<TipoResumen> tipos = new();
+
+    /// <summary>Mayor capacidad del hotel: define hasta cuántas personas se puede pedir.</summary>
+    private int MaximoPersonas => tipos.Count == 0 ? 4 : tipos.Max(t => t.Capacidad);
+
+    /// <summary>Noches del rango elegido; 0 cuando las fechas no son válidas.</summary>
+    private int Noches => salida > entrada ? salida.DayNumber - entrada.DayNumber : 0;
+
+    /// <summary>Tarifa vigente del tipo, tal como la entrega la API (GET /api/admin/tipos).</summary>
+    private decimal? TarifaDe(string nombre) => tipos.FirstOrDefault(t => t.Nombre == nombre)?.TarifaVigente;
+
+    /// <summary>Al cambiar el tipo: recorta las personas si no caben y actualiza la lista si ya se había consultado.</summary>
+    private async Task CambiarTipo()
+    {
+        AjustarPorTipo();
+        if (lista != null) await Buscar();
+    }
+
+    /// <summary>Al cambiar el número de personas: elige el tipo que corresponde y refresca precios y habitaciones.</summary>
+    private async Task CambiarPersonas()
+    {
+        AjustarPorPersonas();
+        if (lista != null) await Buscar();
+    }
+
+    /// <summary>Al cambiar las fechas: el precio estimado se recalcula solo; la lista se refresca si existía.</summary>
+    private async Task CambiarFechas()
+    {
+        if (lista != null && salida > entrada) await Buscar();
+    }
+
+    private static string Personas(int n) => n == 1 ? "1 persona" : $"{n} personas";
+
+    private int CapacidadDe(string nombre) => tipos.FirstOrDefault(t => t.Nombre == nombre)?.Capacidad ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            tipos = await Api.TiposAsync();
+            if (tipos.Count > 0 && tipos.All(t => t.Nombre != tipo)) tipo = tipos[0].Nombre;
+            GarantizarCapacidad();
+        }
+        catch (ApiException) { }   // sin la lista de tipos la pantalla sigue funcionando con los tres fijos
+    }
+
+    /// <summary>Al cambiar el tipo, recorta el número de personas a la capacidad de ese tipo.</summary>
+    private void AjustarPorTipo()
+    {
+        avisoTipo = null;
+        var cap = CapacidadDe(tipo);
+        if (cap > 0 && personas > cap)
+        {
+            personas = cap;
+            avisoTipo = $"La habitación {tipo} admite hasta {Personas(cap)}: se ajustó el número de huéspedes.";
+        }
+    }
+
+    /// <summary>
+    /// Al cambiar el número de personas, el tipo de habitación se elige solo: siempre queda el más
+    /// pequeño que alcanza para esa cantidad, de modo que no se vende una Cuádruple para una persona.
+    /// Si después el usuario quiere otro tipo, lo cambia a mano y esa elección se respeta.
+    /// </summary>
+    private void AjustarPorPersonas()
+    {
+        avisoTipo = null;
+        if (tipos.Count == 0) return;
+        var mejor = tipos.Where(t => t.Capacidad >= personas).OrderBy(t => t.Capacidad).FirstOrDefault();
+        if (mejor == null)
+        {
+            avisoTipo = $"Ninguna habitación admite {Personas(personas)}. La mayor es {tipos.OrderByDescending(t => t.Capacidad).First().Nombre}, para {Personas(MaximoPersonas)}.";
+            return;
+        }
+        if (mejor.Nombre == tipo) return;
+        var anterior = tipo;
+        tipo = mejor.Nombre;
+        avisoTipo = $"Para {Personas(personas)} el tipo cambió de {anterior} a {mejor.Nombre}, que es el que corresponde. Puede elegir otro en la lista si lo necesita.";
+    }
+
+    /// <summary>
+    /// Se usa antes de consultar y al abrir la pantalla: solo interviene cuando el tipo elegido no
+    /// alcanza para el número de personas, de modo que no deshace una elección manual del usuario.
+    /// </summary>
+    private void GarantizarCapacidad()
+    {
+        if (tipos.Count == 0) return;
+        if (CapacidadDe(tipo) >= personas) return;
+        AjustarPorPersonas();
+    }
+
+    private Task EnterDoc(KeyboardEventArgs e) => e.Key == "Enter" ? BuscarHuesped() : Task.CompletedTask;
+
+    private async Task BuscarHuesped()
+    {
+        errorHu = null; huesped = null; var d = documento.Trim();
+        if (d.Length == 0) { errorHu = "Digite el número de documento."; return; }
+        ocupado = true;
+        try { huesped = await Api.HuespedPorDocumentoAsync(d); exento = huesped.ExtranjeroNoResidente; }
+        catch (ApiException ex) { errorHu = ex.Estado == System.Net.HttpStatusCode.NotFound ? "Documento no registrado. Regístrelo en Huéspedes." : ex.Message; }
+        finally { ocupado = false; }
+    }
+
+    private async Task RepetirUltima()
+    {
+        var u = huesped!.UltimaEstadia!;
+        tipo = u.Tipo; personas = u.Personas; medio = u.MedioPago ?? "TARJETA";
+        entrada = DateOnly.FromDateTime(DateTime.Now).AddDays(1); salida = entrada.AddDays(Math.Max(1, u.Noches));
+        await Buscar();
+    }
+
+    private async Task Buscar()
+    {
+        errorDisp = null; lista = null; sel = null; resultado = null; comprobante = null;
+        if (salida <= entrada) { errorDisp = "La fecha de salida debe ser posterior a la de entrada."; return; }
+        GarantizarCapacidad();   // nunca se consulta con un tipo que no alcanza para esas personas
+        ocupado = true;
+        try
+        {
+            lista = await Api.DisponibilidadAsync(tipo, entrada, salida, exento);
+            var cap = lista.FirstOrDefault()?.Capacidad ?? 0;
+            if (cap > 0 && personas > cap)
+            {
+                lista = null;
+                errorDisp = $"Ninguna habitación {tipo} admite {Personas(personas)}: la capacidad del tipo es {cap}. Reduzca el número de huéspedes o divida la reserva en dos habitaciones.";
+            }
+        }
+        catch (ApiException ex) { errorDisp = ex.Message; }
+        finally { ocupado = false; }
+    }
+
+    private void Elegir(HabitacionDisponible h) { if (!h.Disponible) return; sel = h; resultado = null; comprobante = null; errorConf = null; }
+
+    private async Task Confirmar()
+    {
+        if (sel == null || huesped == null) return;
+        errorConf = null; resultado = null; comprobante = null; ocupado = true;
+        try
+        {
+            resultado = await Api.ConfirmarAsync(new SolicitudReserva(huesped.IdHuesped, sel.IdHabitacion, entrada, salida, personas, medio, exento));
+            try { comprobante = await Api.CompartirAsync(resultado.Comprobante); } catch { }
+            lista = await Api.DisponibilidadAsync(tipo, entrada, salida, exento);   // la habitación pasa a Reservada
+        }
+        catch (ApiException ex)
+        {
+            errorConf = ex.Estado == System.Net.HttpStatusCode.Conflict
+                ? $"{ex.Message} No se guardó ningún dato. Vuelva a consultar la disponibilidad."
+                : ex.Message;
+        }
+        finally { ocupado = false; }
+    }
+}

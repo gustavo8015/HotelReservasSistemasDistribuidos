@@ -1,0 +1,208 @@
+@page "/habitacion/{IdTipo:int}"
+@inject ApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>@(detalle?.Tipo ?? "Habitación") · Hotel Reservas</PageTitle>
+
+@* CU-17: ficha de la habitación. Portada grande con la foto, galería, plano isométrico,
+   comodidades y precio exacto de las fechas elegidas. Desde aquí se pasa a la reserva. *@
+
+@if (cargando)
+{
+    <div class="tarjeta"><p class="secundario" style="margin:0">Cargando la habitación…</p></div>
+}
+else if (error != null)
+{
+    <div class="nota error" role="alert">@error</div>
+}
+else if (detalle != null)
+{
+    <header class="portada-ficha">
+        <img @key="FotoActual.Ruta" src="@FotoActual.Ruta" width="1600" height="1200" fetchpriority="high"
+             alt="@(FotoActual.Descripcion ?? ("Habitación " + detalle.Tipo))" />
+        <div class="texto">
+            <h1>Habitación @detalle.Tipo</h1>
+            <p>@detalle.Descripcion</p>
+            <div class="marcas">
+                <span>@(detalle.Capacidad == 1 ? "1 persona" : detalle.Capacidad + " personas")</span>
+                <span>@Galeria.Count foto@(Galeria.Count == 1 ? "" : "s")</span>
+                @if (detalle.Pisos.Count > 0) { <span>@(detalle.Pisos.Count == 1 ? "Piso " : "Pisos ")@Enumeracion(detalle.Pisos)</span> }
+            </div>
+        </div>
+        <a class="volver" href="@EnlaceCatalogo()">Volver al catálogo</a>
+    </header>
+
+    <div class="ficha">
+        <div class="galeria">
+            @if (Galeria.Count > 1)
+            {
+                <div class="miniaturas" role="group" aria-label="Fotos de la habitación">
+                    @for (var i = 0; i < Galeria.Count; i++)
+                    {
+                        var indice = i;
+                        var f = Galeria[i];
+                        <button type="button" class="@(indice == foto ? "sel" : "")"
+                                aria-pressed="@(indice == foto ? "true" : "false")"
+                                aria-label="Ver la foto @(indice + 1) de @Galeria.Count: @f.Descripcion"
+                                @onclick="() => foto = indice">
+                            <img src="@f.Ruta" width="320" height="240" loading="lazy" alt="" />
+                            <span>@f.Descripcion</span>
+                        </button>
+                    }
+                </div>
+            }
+
+            @if (Plano != null)
+            {
+                <h2>Cómo está distribuida</h2>
+                <p class="secundario" style="margin:6px 0 0">Vista en volumen: dónde quedan las camas, el baño y las ventanas dentro de la habitación.</p>
+                <figure class="plano">
+                    <img src="@Plano.Ruta" width="1600" height="1200" loading="lazy"
+                         alt="Plano isométrico de la habitación @detalle.Tipo" />
+                </figure>
+            }
+        </div>
+
+        <aside class="reserva">
+            <div class="tarjeta">
+                <p class="precio-grande">@(detalle.HayTarifa ? ApiClient.Moneda(detalle.TarifaNoche ?? 0) : "Sin tarifa") <span>por noche</span></p>
+
+                <div class="fila" style="margin-top:14px">
+                    <div class="campo"><label for="ent">Llegada</label><input id="ent" type="date" @bind="entrada" @bind:after="Recargar" /></div>
+                    <div class="campo"><label for="sal">Salida</label><input id="sal" type="date" @bind="salida" @bind:after="Recargar" /></div>
+                </div>
+                <div class="campo" style="margin-top:10px"><label for="per">Huéspedes</label>
+                    <select id="per" @bind="personas" @bind:after="Recargar">
+                        @for (var i = 1; i <= detalle.Capacidad; i++) { <option value="@i">@(i == 1 ? "1 persona" : i + " personas")</option> }
+                    </select>
+                </div>
+
+                @if (detalle.HayTarifa)
+                {
+                    <div class="resumen" style="margin-top:16px">
+                        <span class="k">@detalle.Noches noche@(detalle.Noches > 1 ? "s" : "") por @ApiClient.Moneda(detalle.TarifaNoche ?? 0)</span><span class="v">@ApiClient.Moneda(detalle.Subtotal)</span>
+                        <span class="k">IVA 19 %</span><span class="v">@ApiClient.Moneda(detalle.Iva)</span>
+                        <span class="total k">Total</span><span class="total">@ApiClient.Moneda(detalle.PrecioNeto)</span>
+                    </div>
+                }
+
+                <p class="estado @(detalle.Disponible ? "bien" : "mal")" role="status">
+                    @if (detalle.Disponible)
+                    {
+                        <span>Quedan @(detalle.Libres == 1 ? "1 habitación libre" : detalle.Libres + " habitaciones libres") para esas fechas.</span>
+                    }
+                    else if (!detalle.Cabe)
+                    {
+                        <span>Esta habitación admite hasta @(detalle.Capacidad == 1 ? "1 persona" : detalle.Capacidad + " personas").</span>
+                    }
+                    else if (!detalle.HayTarifa)
+                    {
+                        <span>Este tipo de habitación no tiene tarifa vigente para esas fechas.</span>
+                    }
+                    else
+                    {
+                        <span>No quedan habitaciones libres en esas fechas. Pruebe con otras.</span>
+                    }
+                </p>
+
+                @if (detalle.Disponible)
+                {
+                    <button class="btn primario" @onclick="Reservar">Reservar esta habitación</button>
+                }
+                else
+                {
+                    <a class="btn" href="@EnlaceCatalogo()">Ver otras habitaciones</a>
+                }
+            </div>
+        </aside>
+    </div>
+
+    <section class="ficha-detalle">
+        <div>
+            <h2>Lo que incluye</h2>
+            @if (detalle.Comodidades.Count == 0)
+            {
+                <p class="secundario">Todas nuestras habitaciones incluyen baño privado y wifi sin costo.</p>
+            }
+            else
+            {
+                <ul class="comodidades">
+                    @foreach (var c in detalle.Comodidades) { <li>@c</li> }
+                </ul>
+            }
+        </div>
+        <div>
+            <h2>La habitación</h2>
+            <dl class="datos-ficha">
+                <dt>Capacidad</dt><dd>Hasta @(detalle.Capacidad == 1 ? "1 persona" : detalle.Capacidad + " personas")</dd>
+                <dt>Habitaciones de este tipo</dt><dd>@detalle.TotalHabitaciones en el hotel, @detalle.Libres libre@(detalle.Libres == 1 ? "" : "s") en sus fechas</dd>
+                @if (detalle.Pisos.Count > 0)
+                {
+                    <dt>Pisos</dt><dd>@string.Join(", ", detalle.Pisos)</dd>
+                }
+                <dt>Entrada y salida</dt><dd>Entrada desde las 3:00 p. m., salida hasta las 12:00 m.</dd>
+                <dt>Impuestos</dt><dd>El precio incluye el IVA del 19 %. El huésped extranjero no residente queda exento, según el artículo 481 del Estatuto Tributario.</dd>
+            </dl>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public int IdTipo { get; set; }
+    [SupplyParameterFromQuery] public string? Entrada { get; set; }
+    [SupplyParameterFromQuery] public string? Salida { get; set; }
+    [SupplyParameterFromQuery] public int? Personas { get; set; }
+
+    private TipoDetalle? detalle;
+    private string? error;
+    private bool cargando = true;
+    private int foto;
+    private DateOnly entrada = DateOnly.FromDateTime(DateTime.Today).AddDays(1);
+    private DateOnly salida = DateOnly.FromDateTime(DateTime.Today).AddDays(3);
+    private int personas = 2;
+
+    /// <summary>El plano isométrico se guarda como una foto más; aquí se separa del resto de la galería.</summary>
+    private static bool EsPlano(FotoTipo f) => f.Ruta.Contains("plano-", StringComparison.OrdinalIgnoreCase);
+
+    private List<FotoTipo> Galeria => detalle!.Fotos.Where(f => !EsPlano(f)).ToList();
+    private FotoTipo? Plano => detalle!.Fotos.FirstOrDefault(EsPlano);
+
+    private FotoTipo FotoActual => Galeria.Count == 0
+        ? new FotoTipo { Ruta = detalle!.Imagen ?? "img/habitaciones/doble.svg", Descripcion = "Habitación " + detalle.Tipo }
+        : Galeria[Math.Min(foto, Galeria.Count - 1)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (DateOnly.TryParse(Entrada, out var e)) entrada = e;
+        if (DateOnly.TryParse(Salida, out var s)) salida = s;
+        if (Personas is > 0) personas = Personas.Value;
+        await Recargar();
+    }
+
+    private async Task Recargar()
+    {
+        error = null; cargando = true;
+        if (salida <= entrada) salida = entrada.AddDays(1);
+        try
+        {
+            detalle = await Api.TipoDetalleAsync(IdTipo, entrada, salida, personas);
+            if (personas > detalle.Capacidad) personas = detalle.Capacidad;
+            if (foto >= Galeria.Count) foto = 0;
+        }
+        catch (ApiException ex) { error = ex.Message; }
+        finally { cargando = false; }
+    }
+
+    /// <summary>Une una lista corta en lenguaje natural: 1, 2 y 3.</summary>
+    private static string Enumeracion(List<int> valores) => valores.Count switch
+    {
+        0 => "",
+        1 => valores[0].ToString(),
+        _ => string.Join(", ", valores.Take(valores.Count - 1)) + " y " + valores[^1]
+    };
+
+    private string EnlaceCatalogo() => $"/?entrada={entrada:yyyy-MM-dd}&salida={salida:yyyy-MM-dd}&personas={personas}";
+
+    private void Reservar() =>
+        Nav.NavigateTo($"reservar/{IdTipo}?entrada={entrada:yyyy-MM-dd}&salida={salida:yyyy-MM-dd}&personas={personas}");
+}

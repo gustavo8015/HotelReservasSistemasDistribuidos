@@ -1,0 +1,120 @@
+@page "/reportes"
+@inject ApiClient Api
+@inject Sesion Sesion
+
+<PageTitle>Reportes · Hotel Reservas</PageTitle>
+
+<div class="encabezado"><h2>Reportes</h2><span class="chip">CU-12 · CU-13 · RNF05</span>
+    <span class="sub">Historial de reservas, ocupación y bitácora de auditoría de cambios.</span></div>
+
+<RequiereSesion>
+@if (error != null) { <div class="nota error">@error</div> }
+@if (lista != null)
+{
+    <div class="grid g4">
+        <div class="tarjeta kpi verde"><b>@lista.Count(r => r.Estado == "CONFIRMADA")</b><span>Confirmadas</span></div>
+        <div class="tarjeta kpi"><b>@lista.Count(r => r.Estado == "EN_CASA")</b><span>En casa</span></div>
+        <div class="tarjeta kpi"><b>@lista.Count(r => r.Estado == "FINALIZADA")</b><span>Finalizadas</span></div>
+        <div class="tarjeta kpi naranja"><b>@ApiClient.Moneda(lista.Where(r => r.Estado is "CONFIRMADA" or "EN_CASA").Sum(r => r.PrecioNeto))</b><span>Ingresos netos comprometidos</span></div>
+    </div>
+    <div class="tarjeta">
+        <div class="fila" style="margin-bottom:10px">
+            <div class="campo" style="flex:0 1 220px"><label for="estado">Estado</label>
+                <select id="estado" @bind="filtro"><option value="">Todas</option><option>CONFIRMADA</option><option>EN_CASA</option><option>FINALIZADA</option><option>CANCELADA</option></select></div>
+            <button class="btn" @onclick="Cargar">Actualizar</button>
+        </div>
+        <div class="tabla">
+        <table>
+            <tr><th>Reserva</th><th>Hab.</th><th>Huésped</th><th>Fechas</th><th>Precio neto</th><th>Estado</th><th>Acciones</th></tr>
+            @foreach (var r in lista.Where(r => filtro == "" || r.Estado == filtro))
+            {
+                <tr>
+                    <td class="mono">@r.Codigo</td><td><b>@r.Habitacion</b> <small class="secundario">@r.Tipo</small></td><td>@r.Huesped</td>
+                    <td class="mono">@r.FechaEntrada.ToString("yyyy-MM-dd") → @r.FechaSalida.ToString("yyyy-MM-dd")</td>
+                    <td class="mono">@ApiClient.Moneda(r.PrecioNeto)<br /><small class="secundario">IVA @(r.ExentoIva ? "exento" : ApiClient.Moneda(r.Impuesto))</small></td>
+                    <td><span class="chip @(r.Estado == "CONFIRMADA" ? "ok" : r.Estado == "EN_CASA" ? "azul" : r.Estado == "CANCELADA" ? "rojo" : r.Estado == "PENDIENTE" ? "naranja" : "")">@(r.Estado == "PENDIENTE" ? "SIN PAGAR" : r.Estado)</span></td>
+                    <td style="white-space:nowrap">
+                        <button class="btn chico" @onclick="() => Detalle(r.Codigo)">Detalle</button>
+                        @* Reserva retenida en efectivo: recepción cobra y la confirma (script 18). *@
+                        @if (r.Estado == "PENDIENTE") { <button class="btn chico primario" @onclick='() => Cambiar(r, "registrar-pago")'>Registrar pago</button> }
+                        @if (r.Estado == "CONFIRMADA") { <button class="btn chico" @onclick='() => Cambiar(r, "checkin")'>Check-in</button> }
+                        @if ((r.Estado == "CONFIRMADA" || r.Estado == "PENDIENTE") && Sesion.EsAdministrador) { <button class="btn chico" @onclick='() => Cambiar(r, "cancelar")'>Cancelar</button> }
+                        @if (r.Estado == "EN_CASA") { <button class="btn chico" @onclick='() => Cambiar(r, "checkout")'>Check-out</button> }
+                    </td>
+                </tr>
+            }
+        </table>
+        </div>
+        @if (lista.Count == 0) { <p class="secundario">Sin reservas.</p> }
+    </div>
+}
+else if (error == null) { <p class="secundario">Cargando…</p> }
+
+@if (det != null)
+{
+    <div class="grid g21">
+        <div class="tarjeta">
+            <h3>Reserva @det.Codigo · bitácora (RNF05)</h3>
+            <p class="secundario" style="margin:8px 0">Hab. @det.Habitacion (@det.Tipo) · @det.Huesped.Nombres @det.Huesped.Apellidos (@det.Huesped.Documento) · @det.FechaEntrada.ToString("yyyy-MM-dd") → @det.FechaSalida.ToString("yyyy-MM-dd") · @det.NumeroPersonas pers. · subtotal @ApiClient.Moneda(det.Subtotal) + IVA @ApiClient.Moneda(det.Impuesto) = <b>neto @ApiClient.Moneda(det.PrecioNeto)</b> · <span class="mono">version_fila @det.VersionFila</span></p>
+            <div class="tabla"><table>
+                <tr><th>Fecha</th><th>Usuario</th><th>Cambio</th><th>Detalle</th></tr>
+                @foreach (var b in det.Bitacora) { <tr><td class="mono">@b.Fecha.ToString("yyyy-MM-dd HH:mm")</td><td>@b.Usuario</td><td>@(b.EstadoAnterior ?? "-") → <b>@b.EstadoNuevo</b></td><td class="secundario">@b.Detalle</td></tr> }
+            </table></div>
+            <h3 style="margin-top:12px">Pagos</h3>
+            <div class="tabla"><table>
+                <tr><th>Fecha</th><th>Medio</th><th>Valor</th><th>Estado</th></tr>
+                @foreach (var p in det.Pagos) { <tr><td class="mono">@p.Fecha.ToString("yyyy-MM-dd HH:mm")</td><td>@p.Medio</td><td class="mono">@ApiClient.Moneda(p.Valor)</td><td>@p.Estado</td></tr> }
+            </table></div>
+        </div>
+        <div class="tarjeta">
+            <h3>Comprobante (RF17)</h3>
+            @if (det.Comprobante == null) { <p class="secundario">Sin comprobante.</p> }
+            else if (comp == null) { <p class="secundario">Cargando…</p> }
+            else
+            {
+                <div class="ticket" style="margin-top:10px"><pre>@comp.Texto.Replace("*", "")</pre>
+                    @if (comp.EnlaceWhatsApp != null) { <div style="margin-top:12px"><a class="btn wa" href="@comp.EnlaceWhatsApp" target="_blank" rel="noopener">Enviar por WhatsApp · +@comp.Telefono</a></div> }
+                </div>
+            }
+        </div>
+    </div>
+}
+@if (aviso != null) { <div class="nota @(avisoError ? "error" : "ok")">@aviso</div> }
+</RequiereSesion>
+
+@code {
+    private List<ReservaResumen>? lista; private ReservaDetalle? det; private ComprobanteCompartir? comp;
+    private string filtro = ""; private string? error, aviso; private bool avisoError;
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        error = null;
+        try { lista = await Api.ReservasAsync(); }
+        catch (ApiException ex) { error = ex.Message; }
+    }
+
+    private async Task Detalle(string codigo)
+    {
+        det = null; comp = null; aviso = null;
+        try
+        {
+            det = await Api.ReservaAsync(codigo);
+            if (det.Comprobante != null) comp = await Api.CompartirAsync(det.Comprobante.Numero);
+        }
+        catch (ApiException ex) { aviso = ex.Message; avisoError = true; }
+    }
+
+    private async Task Cambiar(ReservaResumen r, string accion)
+    {
+        aviso = null; avisoError = false;
+        try
+        {
+            await Api.CambiarEstadoAsync(r.Codigo, accion, r.VersionFila);   // concurrencia optimista: ROWVERSION
+            aviso = $"{r.Codigo}: {accion} registrado.";
+            await Cargar(); if (det?.Codigo == r.Codigo) await Detalle(r.Codigo);
+        }
+        catch (ApiException ex) { aviso = ex.Message; avisoError = true; await Cargar(); }
+    }
+}

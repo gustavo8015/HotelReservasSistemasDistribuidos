@@ -1,0 +1,85 @@
+### Hotel Reservas API - pruebas rápidas (Visual Studio 2022 / extensión REST Client de VS Code)
+@url = http://localhost:5080
+@token = PEGUE_AQUI_EL_TOKEN_DEL_LOGIN
+
+### 0. Salud
+GET {{url}}/api/salud
+
+### 1. CU-01 Login (usuarios del script 03; contraseña del script 06)
+POST {{url}}/api/auth/login
+Content-Type: application/json
+
+{ "correo": "recepcion1@hotel.com", "clave": "Hotel2026*" }
+
+### 2. CU-03 Disponibilidad (precio neto con IVA 19 %)
+GET {{url}}/api/disponibilidad?tipo=Doble&entrada=2026-10-16&salida=2026-10-18
+Authorization: Bearer {{token}}
+
+### 3. RF18 Huésped frecuente por documento
+GET {{url}}/api/huespedes?documento=2020202020
+Authorization: Bearer {{token}}
+
+### 4. CU-04/05/06 + RF16 Confirmar reserva (sp_ConfirmarReserva). Repetir con la misma habitación y fechas → 409
+POST {{url}}/api/reservas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "idHuesped": 2, "idHabitacion": 3, "fechaEntrada": "2026-10-16", "fechaSalida": "2026-10-18", "numeroPersonas": 2, "medioPago": "TARJETA", "exentoIva": null }
+
+### 5. RF17 Comprobante compartible (use el número devuelto en el paso 4)
+GET {{url}}/api/comprobantes/CMP000000003/compartir
+Authorization: Bearer {{token}}
+
+### 6. Historial y detalle con bitácora (RNF05)
+GET {{url}}/api/reservas/RSV000000045
+Authorization: Bearer {{token}}
+
+### 7. Check-in con concurrencia optimista (versionFila del paso 6)
+PUT {{url}}/api/reservas/RSV000000045/checkin
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "versionFila": null, "detalle": "Llegada del huésped" }
+
+### 8. Servicio de IA: estado del intérprete (AZURE_OPENAI si hay credenciales; si no, REGLAS)
+GET {{url}}/api/asistente/estado
+Authorization: Bearer {{token}}
+
+### 9. Servicio de IA: consultas en lenguaje natural (solo lectura)
+POST {{url}}/api/asistente
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "consulta": "¿Qué habitaciones dobles hay libres del 16 al 18 de octubre?" }
+
+###
+POST {{url}}/api/asistente
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "consulta": "¿Cuánto cuesta una suite por 3 noches con IVA?" }
+
+###
+POST {{url}}/api/asistente
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "consulta": "¿En qué estado está la reserva RSV000000045?" }
+
+###
+POST {{url}}/api/asistente
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "consulta": "¿Cuántas llegadas tenemos mañana?" }
+
+### Operación de escritura: el asistente la rechaza y remite a la pantalla Reservas
+POST {{url}}/api/asistente
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "consulta": "Reserva la 103 para Laura Martínez del 20 al 22" }
+
+### 10. Catálogo de funciones que se entrega al modelo
+GET {{url}}/api/asistente/funciones
+Authorization: Bearer {{token}}

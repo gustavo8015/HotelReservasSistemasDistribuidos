@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="Asistente del hotel">
+  <defs>
+    <radialGradient id="fondo" cx="50%" cy="34%" r="78%">
+      <stop offset="0%" stop-color="#2F5A96"/>
+      <stop offset="100%" stop-color="#0B2A5B"/>
+    </radialGradient>
+    <linearGradient id="uniforme" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#15375F"/>
+      <stop offset="100%" stop-color="#0B2444"/>
+    </linearGradient>
+    <clipPath id="disco"><circle cx="80" cy="80" r="80"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#disco)">
+    <circle cx="80" cy="80" r="80" fill="url(#fondo)"/>
+
+    <!-- hombros y uniforme -->
+    <path d="M22 160c0-28 24-44 58-44s58 16 58 44z" fill="url(#uniforme)"/>
+    <path d="M62 118l18 20 18-20 10 5-28 37-28-37z" fill="#F6F8FB"/>
+    <path d="M80 138l-7 10 7 12 7-12z" fill="#A16207"/>
+
+    <!-- cuello -->
+    <path d="M69 98h22v22c0 6-22 6-22 0z" fill="#E8B48C"/>
+    <path d="M69 104c6 6 16 6 22 0v-6H69z" fill="#D49B72"/>
+
+    <!-- cabello, parte de atrás -->
+    <path d="M44 74c0-24 16-40 36-40s36 16 36 40c0 14-2 24-5 32l-8-6c3-10 3-18 2-24-10 2-38 4-50-8-4 8-4 20-3 32l-8 6c-3-8-5-18-5-32z" fill="#4A2F22"/>
+
+    <!-- rostro -->
+    <ellipse cx="80" cy="76" rx="27" ry="31" fill="#F0BF96"/>
+    <path d="M53 74c0-1 1-2 2-2 2 0 3 4 3 8s-1 8-3 8-2-1-2-2z" fill="#F0BF96"/>
+    <ellipse cx="55" cy="80" rx="4" ry="6" fill="#E8B48C"/>
+    <ellipse cx="105" cy="80" rx="4" ry="6" fill="#E8B48C"/>
+
+    <!-- flequillo -->
+    <path d="M51 70c2-20 14-32 29-32s27 12 29 32c-6-10-14-16-24-16-14 0-24 6-34 16z" fill="#5B3A2A"/>
+
+    <!-- ojos y cejas -->
+    <path d="M64 68c3-3 9-3 12 0" stroke="#3B2418" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <path d="M84 68c3-3 9-3 12 0" stroke="#3B2418" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <circle cx="70" cy="78" r="3.6" fill="#2A1A12"/>
+    <circle cx="90" cy="78" r="3.6" fill="#2A1A12"/>
+    <circle cx="71.3" cy="76.8" r="1.2" fill="#FFFFFF"/>
+    <circle cx="91.3" cy="76.8" r="1.2" fill="#FFFFFF"/>
+
+    <!-- sonrisa -->
+    <path d="M72 90c4 5 12 5 16 0" stroke="#A8553F" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+    <circle cx="63" cy="87" r="4" fill="#E79A86" opacity=".45"/>
+    <circle cx="97" cy="87" r="4" fill="#E79A86" opacity=".45"/>
+
+    <!-- diadema de servicio -->
+    <path d="M52 76a28 28 0 0 1 56 0" stroke="#111A2B" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <rect x="46" y="72" width="10" height="16" rx="5" fill="#111A2B"/>
+    <rect x="104" y="72" width="10" height="16" rx="5" fill="#111A2B"/>
+    <path d="M51 88c0 10 6 16 14 17" stroke="#111A2B" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="66" cy="105" r="3.4" fill="#111A2B"/>
+  </g>
+</svg>

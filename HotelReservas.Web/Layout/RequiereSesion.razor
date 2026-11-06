@@ -1,0 +1,20 @@
+@inject Sesion Sesion
+@inject NavigationManager Nav
+
+@* Protege las páginas que consumen la API: si no hay token, muestra el aviso y el acceso al inicio de sesión. *@
+@if (Sesion.Activa)
+{
+    @ChildContent
+}
+else
+{
+    <div class="tarjeta">
+        <h3>Inicie sesión para usar este módulo</h3>
+        <p class="secundario">Esta pantalla es de la operación interna del hotel. Entre con su cuenta para continuar.</p>
+        <button class="btn primario" @onclick='() => Nav.NavigateTo("login")'>Iniciar sesión</button>
+    </div>
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

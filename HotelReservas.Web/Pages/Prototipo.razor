@@ -1,0 +1,13 @@
+@page "/prototipo"
+@page "/prototipo/{Vista}"
+
+<PageTitle>Prototipo funcional · Hotel Reservas</PageTitle>
+
+@* Equivale a Views/PrototipoPage.xaml de la app MAUI (WebView sobre prototipo.html). Aquí se carga en un iframe desde wwwroot. *@
+<div class="encabezado"><h2>Prototipo funcional</h2><span class="chip">Simulación local · sin API</span>
+    <span class="sub">Mismo prototipo que viaja dentro de la APK: impuestos, comprobante por WhatsApp, reserva rápida, prueba de concurrencia y asistente simulado.</span></div>
+<iframe class="marco" src="@($"prototipo.html?apk=1&vista={Vista ?? "inicio"}")" title="Prototipo funcional Hotel Reservas"></iframe>
+
+@code {
+    [Parameter] public string? Vista { get; set; }
+}

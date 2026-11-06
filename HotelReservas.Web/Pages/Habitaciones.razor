@@ -1,0 +1,75 @@
+@page "/habitaciones"
+@inject ApiClient Api
+
+<PageTitle>Habitaciones · Hotel Reservas</PageTitle>
+
+<div class="encabezado"><h2>Habitaciones</h2><span class="chip">CU-11 · RF11</span>
+    <span class="sub">Inventario de habitaciones, tipos, tarifas y consulta de disponibilidad por fechas.</span></div>
+
+<RequiereSesion>
+<div class="tarjeta">
+    <div class="fila">
+        <div class="campo"><label for="ent">Entrada</label><input id="ent" type="date" @bind="entrada" /></div>
+        <div class="campo"><label for="sal">Salida</label><input id="sal" type="date" @bind="salida" /></div>
+        <button class="btn azul" @onclick="Cargar" disabled="@cargando">Consultar estado por fechas</button>
+    </div>
+    @if (error != null) { <div class="nota error" style="margin-top:10px">@error</div> }
+</div>
+
+@foreach (var tipo in tipos)
+{
+    var hs = porTipo.GetValueOrDefault(tipo);
+    <div class="tarjeta">
+        <div class="encabezado" style="margin-bottom:10px"><h3>@tipo</h3>
+            @if (hs != null && hs.Count > 0) { <span class="chip">@ApiClient.Moneda(hs[0].TarifaNoche) por noche + IVA · @hs[0].Capacidad pers.</span><span class="chip ok">@hs.Count(h => h.Disponible) disponibles de @hs.Count</span> }
+        </div>
+        @if (hs == null) { <p class="secundario">@(cargando ? "Consultando…" : "Sin datos.")</p> }
+        else
+        {
+            <div class="habs">
+                @foreach (var h in hs.OrderBy(x => x.Numero))
+                {
+                    <div class="hab off">
+                        <div style="display:flex;justify-content:space-between;align-items:center"><b>@h.Numero</b>
+                            <span class="chip @(h.Estado == "DISPONIBLE" ? "ok" : h.Estado == "RESERVADA" ? "naranja" : "")">@h.Estado</span></div>
+                        <small>Piso @h.Piso · @h.Tipo</small>
+                        <span class="precio">@ApiClient.Moneda(h.PrecioNeto)<small style="font-weight:500"> neto · @h.Noches noche(s)</small></span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+</RequiereSesion>
+
+@code {
+    /// <summary>
+    /// Los tipos se piden a la API (GET /api/admin/tipos) para que un tipo nuevo,
+    /// como Cuádruple, aparezca aquí sin tocar el código. La lista fija solo se
+    /// usa si esa consulta falla.
+    /// </summary>
+    private static readonly string[] tiposPorDefecto = { "Sencilla", "Doble", "Triple", "Cuádruple" };
+    private string[] tipos = tiposPorDefecto;
+    private DateOnly entrada = DateOnly.FromDateTime(DateTime.Now), salida = DateOnly.FromDateTime(DateTime.Now).AddDays(1);
+    private readonly Dictionary<string, List<HabitacionDisponible>> porTipo = new();
+    private bool cargando; private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var lista = await Api.TiposAsync();
+            if (lista.Count > 0) tipos = lista.OrderBy(t => t.Capacidad).ThenBy(t => t.Nombre).Select(t => t.Nombre).ToArray();
+        }
+        catch (ApiException) { /* se conserva la lista por defecto */ }
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        error = null; cargando = true; porTipo.Clear();
+        try { foreach (var t in tipos) porTipo[t] = await Api.DisponibilidadAsync(t, entrada, salida); }
+        catch (ApiException ex) { error = ex.Message; }
+        finally { cargando = false; }
+    }
+}

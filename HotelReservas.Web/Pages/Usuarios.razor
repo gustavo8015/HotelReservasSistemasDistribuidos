@@ -1,0 +1,151 @@
+@page "/usuarios"
+@inject ApiClient Api
+@inject Sesion Sesion
+
+<PageTitle>Usuarios · Hotel Reservas</PageTitle>
+
+<div class="encabezado"><h2>Usuarios</h2><span class="chip">CU-15 · RF01 · solo ADMINISTRADOR</span>
+    <span class="sub">Crear, desactivar o eliminar cuentas de cliente. Las contraseñas se guardan con PBKDF2 (RNF01); la trazabilidad de la bitácora se conserva (RNF05).</span></div>
+
+<RequiereSesion>
+@if (!Sesion.EsAdministrador)
+{
+    <div class="tarjeta">
+        <h3>Acceso restringido</h3>
+        <p class="secundario">Este módulo es exclusivo del rol ADMINISTRADOR. Su sesión actual tiene el rol <b>@Sesion.Rol</b>. Si intenta llamar a la API directamente, responde 403 Forbidden.</p>
+    </div>
+}
+else
+{
+    <div class="grid">
+        <div class="tarjeta">
+            <h3>Cuentas del sistema</h3>
+            @if (error != null) { <div class="nota error" style="margin-top:10px">@error</div> }
+            @if (lista == null) { <p class="secundario" style="margin-top:10px">Cargando…</p> }
+            else
+            {
+                <div class="tabla" style="margin-top:10px">
+                <table>
+                    <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Actividad</th><th>Acciones</th></tr>
+                    @foreach (var u in lista)
+                    {
+                        <tr>
+                            <td><b>@u.Nombre</b>@if (u.IdUsuario == idActual) { <small class="secundario"> (usted)</small> }</td>
+                            <td class="mono">@u.Correo</td>
+                            <td><span class="chip @(u.Rol == "ADMINISTRADOR" ? "azul" : "")">@u.Rol</span></td>
+                            <td><span class="chip @(u.Activo ? "ok" : "rojo")">@(u.Activo ? "Activo" : "Inactivo")</span></td>
+                            <td class="secundario" style="white-space:nowrap">@u.Reservas res. · @u.Movimientos mov.</td>
+                            <td style="min-width:150px">
+                                @if (Gestionable(u))
+                                {
+                                    if (confirmarId == u.IdUsuario)
+                                    {
+                                        <button class="btn chico primario" @onclick="() => Eliminar(u)" disabled="@ocupado">Sí, @(u.Reservas + u.Movimientos > 0 ? "desactivar" : "eliminar")</button>
+                                        <button class="btn chico" @onclick="() => { confirmarId = null; }">No</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn chico" @onclick="() => { confirmarId = u.IdUsuario; }">Eliminar</button>
+                                        @if (!u.Activo) { <button class="btn chico" @onclick="() => Reactivar(u)" disabled="@ocupado">Reactivar</button> }
+                                    }
+                                }
+                                else { <small class="secundario">@Motivo(u)</small> }
+                            </td>
+                        </tr>
+                    }
+                </table>
+                </div>
+                <p class="secundario" style="margin:10px 0 0">Una cuenta de cliente con reservas o movimientos de bitácora no se borra físicamente, porque las claves foráneas FK_RESERVA_USUARIO y FK_BITACORA_USUARIO lo impiden y se perdería la trazabilidad: la API la desactiva y la persona deja de poder iniciar sesión, aunque sus reservas siguen en el historial del hotel. Una cuenta sin historial se elimina definitivamente. La cuenta del administrador y la cuenta técnica del portal no se tocan: la segunda es la responsable de las reservas que hacen los visitantes sin iniciar sesión.</p>
+            }
+            @if (aviso != null) { <div class="nota @(avisoError ? "error" : "ok")" role="@(avisoError ? "alert" : "status")" style="margin-top:10px">@aviso</div> }
+        </div>
+
+        <div class="tarjeta" style="max-width:420px">
+            <h3>Nueva cuenta de cliente</h3>
+            <div class="campo" style="margin-top:10px"><label for="nom">Nombre completo</label><input id="nom" @bind="nombre" placeholder="Ej. Laura Gómez" /></div>
+            <div class="campo" style="margin-top:8px"><label for="cor">Correo</label><input id="cor" @bind="correo" placeholder="cliente@@correo.com" autocomplete="off" /></div>
+            <div class="campo" style="margin-top:8px"><label for="cla">Contraseña inicial (mínimo 8 caracteres)</label><input id="cla" type="password" @bind="clave" autocomplete="new-password" /></div>
+            @if (errorNuevo != null) { <div class="nota error" style="margin-top:10px">@errorNuevo</div> }
+            <div class="fila" style="margin-top:12px"><button class="btn primario" @onclick="Crear" disabled="@ocupado">Crear cuenta</button></div>
+            <p class="secundario" style="margin:12px 0 0">La API genera el hash PBKDF2-SHA256 y guarda la cuenta con el perfil CLIENTE (POST /api/usuarios). El perfil ADMINISTRADOR se asigna solo desde la base de datos. El usuario final también puede crear su propia cuenta desde el portal, y ahí queda ligada a su documento.</p>
+        </div>
+    </div>
+}
+</RequiereSesion>
+
+@code {
+    private List<UsuarioResumen>? lista;
+    private string nombre = "", correo = "", clave = "";
+    private string? error, errorNuevo, aviso; private bool avisoError, ocupado;
+    private int? confirmarId; private int idActual;
+    private const string CorreoPortal = "portal@hotel.com";
+
+    /// <summary>Se pueden eliminar las cuentas de cliente, menos la técnica del portal y la propia sesión.</summary>
+    private bool Gestionable(UsuarioResumen u) =>
+        u.Rol != "ADMINISTRADOR" && u.Correo != CorreoPortal && u.IdUsuario != idActual;
+
+    private string Motivo(UsuarioResumen u) =>
+        u.IdUsuario == idActual ? "Su propia cuenta"
+        : u.Correo == CorreoPortal ? "Cuenta del portal"
+        : "Administrador";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Sesion.EsAdministrador) return;
+        idActual = IdDesdeToken(Sesion.Token!);
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        error = null;
+        try { lista = await Api.UsuariosAsync(); }
+        catch (ApiException ex) { error = ex.Message; }
+    }
+
+    private async Task Crear()
+    {
+        errorNuevo = null; aviso = null;
+        if (nombre.Trim().Length == 0 || correo.Trim().Length == 0) { errorNuevo = "Nombre y correo son obligatorios."; return; }
+        if (clave.Length < 8) { errorNuevo = "La contraseña debe tener al menos 8 caracteres."; return; }
+        ocupado = true;
+        try
+        {
+            await Api.CrearUsuarioAsync(new NuevoUsuario(nombre.Trim(), correo.Trim(), clave));
+            aviso = $"Cuenta de {nombre.Trim()} creada."; avisoError = false;
+            nombre = correo = clave = "";
+            await Cargar();
+        }
+        catch (ApiException ex) { errorNuevo = ex.Message; }
+        finally { ocupado = false; }
+    }
+
+    private async Task Eliminar(UsuarioResumen u)
+    {
+        aviso = null; ocupado = true; confirmarId = null;
+        try { var r = await Api.EliminarUsuarioAsync(u.IdUsuario); aviso = r.Mensaje; avisoError = false; await Cargar(); }
+        catch (ApiException ex) { aviso = ex.Message; avisoError = true; }
+        finally { ocupado = false; }
+    }
+
+    private async Task Reactivar(UsuarioResumen u)
+    {
+        aviso = null; ocupado = true;
+        try { var r = await Api.ReactivarUsuarioAsync(u.IdUsuario); aviso = r.Mensaje; avisoError = false; await Cargar(); }
+        catch (ApiException ex) { aviso = ex.Message; avisoError = true; }
+        finally { ocupado = false; }
+    }
+
+    /// <summary>Lee el claim "sub" (id del usuario) del JWT sin dependencias externas, para marcar la cuenta propia.</summary>
+    private static int IdDesdeToken(string jwt)
+    {
+        try
+        {
+            var p = jwt.Split('.')[1].Replace('-', '+').Replace('_', '/');
+            p = p.PadRight(p.Length + (4 - p.Length % 4) % 4, '=');
+            using var doc = System.Text.Json.JsonDocument.Parse(Convert.FromBase64String(p));
+            return doc.RootElement.TryGetProperty("sub", out var s) && int.TryParse(s.GetString(), out var id) ? id : 0;
+        }
+        catch { return 0; }
+    }
+}

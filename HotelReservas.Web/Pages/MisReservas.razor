@@ -1,0 +1,192 @@
+@page "/mis-reservas"
+@inject ApiClient Api
+@inject Sesion Sesion
+@inject NavigationManager Nav
+
+<PageTitle>Mis reservas · Hotel Reservas</PageTitle>
+
+@* CU-16 / RF21: historial del usuario final. Solo muestra las reservas de la ficha de huésped
+   ligada a su cuenta; la API responde 403 a cualquier otro perfil. *@
+
+<div class="encabezado"><h2>Mis reservas</h2><span class="chip verde">@Sesion.Nombre</span>
+    <span class="sub">Sus estadías, el comprobante de cada una y el canal por el que se envió. Puede cancelar
+    una reserva hasta @HorasMinimasCancelacion horas antes de la llegada.</span></div>
+
+@if (aviso != null)
+{
+    <div class="nota ok" role="status">@aviso</div>
+}
+
+@if (!Sesion.Activa)
+{
+    <div class="tarjeta">
+        <h3>Inicie sesión</h3>
+        <p class="secundario">Entre con la cuenta que creó al reservar para ver su historial.</p>
+        <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn primario" @onclick='() => Nav.NavigateTo("login")'>Iniciar sesión</button>
+            <button class="btn" @onclick='() => Nav.NavigateTo("registro")'>Crear cuenta</button>
+        </div>
+    </div>
+}
+else if (cargando)
+{
+    <div class="tarjeta"><p class="secundario" style="margin:0">Cargando…</p></div>
+}
+else if (error != null)
+{
+    <div class="nota error" role="alert">@error</div>
+}
+else if (reservas is { Count: 0 })
+{
+    <div class="tarjeta">
+        <h3>Todavía no tiene reservas</h3>
+        <p class="secundario">Cuando reserve con el documento de su cuenta, la estadía aparecerá aquí.</p>
+        <button class="btn primario" style="margin-top:10px" @onclick='() => Nav.NavigateTo("")'>Ver habitaciones</button>
+    </div>
+}
+else
+{
+    <div class="catalogo">
+        @foreach (var r in reservas!)
+        {
+            <div class="hcard">
+                <div class="foto">
+                    <img src="@(string.IsNullOrEmpty(r.Imagen) ? "img/habitaciones/doble.svg" : r.Imagen)" alt="Habitación @r.Tipo" />
+                    <span class="etiqueta">@r.Tipo</span>
+                </div>
+                <div class="cuerpo">
+                    <div class="titulo">
+                        <b>@r.Codigo</b>
+                        <span class="chip @Color(r.Estado)">@Rotulo(r.Estado)</span>
+                    </div>
+
+                    @if (r.Estado == "PENDIENTE" && r.LimitePago is DateTime limite)
+                    {
+                        <div class="nota aviso" style="margin:0" role="status">
+                            <b>Falta el pago.</b> Hasta el @limite.ToString("d 'de' MMMM", Cultura)
+                            a las @limite.ToString("HH:mm") en recepción. Después la habitación se libera.
+                        </div>
+                    }
+                    <div class="resumen">
+                        <span class="k">Habitación</span><span class="v">@r.Habitacion</span>
+                        <span class="k">Llegada</span><span class="v mono">@r.FechaEntrada.ToString("yyyy-MM-dd")</span>
+                        <span class="k">Salida</span><span class="v mono">@r.FechaSalida.ToString("yyyy-MM-dd")</span>
+                        <span class="k">Huéspedes</span><span class="v">@r.NumeroPersonas</span>
+                        <span class="k">Pago</span><span class="v">@(r.MedioPago ?? "-")</span>
+                        <span class="total k">Total</span><span class="total">@ApiClient.Moneda(r.PrecioNeto)</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(r.Referencia)) { <p class="secundario mono" style="margin:0">@r.Referencia</p> }
+                    @if (!string.IsNullOrEmpty(r.Comprobante))
+                    {
+                        <button class="btn chico" @onclick="() => VerComprobante(r)">Ver comprobante @r.Comprobante</button>
+                    }
+
+                    @* Cancelar es irreversible, así que no se ejecuta con un solo clic:
+                       el botón abre una confirmación dentro de la misma tarjeta. *@
+                    @if (porCancelar == r.Codigo)
+                    {
+                        <div class="nota aviso" style="margin:0">
+                            <b>¿Cancela la reserva @r.Codigo?</b>
+                            @(r.Estado == "PENDIENTE"
+                                ? " Todavía no ha pagado, así que no hay devolución pendiente."
+                                : " Si pagó con tarjeta, el valor se devuelve a la misma tarjeta.")
+                            Esta acción no se puede deshacer.
+                            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+                                <button class="btn chico" style="background:var(--danger);border-color:var(--danger);color:#fff"
+                                        disabled="@cancelando" @onclick="() => Cancelar(r)">
+                                    @(cancelando ? "Cancelando…" : "Sí, cancelar")
+                                </button>
+                                <button class="btn chico" disabled="@cancelando" @onclick="() => porCancelar = null">No, conservarla</button>
+                            </div>
+                        </div>
+                    }
+                    else if (r.PuedeCancelar)
+                    {
+                        <button class="btn chico" @onclick="() => porCancelar = r.Codigo">Cancelar esta reserva</button>
+                    }
+                    else if (!string.IsNullOrEmpty(r.MotivoCancelacion) && r.Estado != "CANCELADA" && r.Estado != "FINALIZADA")
+                    {
+                        <p class="secundario" style="margin:0">@r.MotivoCancelacion</p>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (comprobante != null)
+    {
+        <div class="tarjeta">
+            <h3>Comprobante @comprobante.Comprobante</h3>
+            <div class="ticket" style="margin-top:10px"><pre>@comprobante.Texto</pre></div>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                @if (comprobante.EnlaceWhatsApp != null) { <a class="btn wa" href="@comprobante.EnlaceWhatsApp" target="_blank">Enviar por WhatsApp</a> }
+                @if (comprobante.EnlaceCorreo != null) { <a class="btn azul" href="@comprobante.EnlaceCorreo">Enviar por correo</a> }
+                <button class="btn" @onclick="() => comprobante = null">Cerrar</button>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    /// <summary>Igual que PortalController.HorasMinimasCancelacion; aquí solo se anuncia la regla.</summary>
+    private const int HorasMinimasCancelacion = 24;
+    private static readonly System.Globalization.CultureInfo Cultura = new("es-CO");
+
+    private List<ReservaCliente>? reservas;
+    private ComprobantePortal? comprobante;
+    private string? error;
+    private string? aviso;
+    private string? porCancelar;
+    private bool cargando;
+    private bool cancelando;
+
+    private static string Color(string estado) => estado switch
+    {
+        "CANCELADA" => "rojo",
+        "PENDIENTE" => "naranja",
+        "FINALIZADA" => "",
+        _ => "ok",
+    };
+
+    private static string Rotulo(string estado) => estado == "PENDIENTE" ? "SIN PAGAR" : estado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Sesion.Activa) return;
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        cargando = true; error = null;
+        try { reservas = await Api.MisReservasAsync(); }
+        catch (ApiException ex) { error = ex.Message; }
+        finally { cargando = false; }
+    }
+
+    /// <summary>
+    /// CU-18: el huésped cancela su propia reserva. La API vuelve a verificar la regla de las
+    /// @HorasMinimasCancelacion horas, de modo que la pantalla no es la única que la controla.
+    /// </summary>
+    private async Task Cancelar(ReservaCliente r)
+    {
+        cancelando = true; error = null; aviso = null;
+        try
+        {
+            var res = await Api.CancelarMiReservaAsync(r.Codigo, Sesion.Documento);
+            aviso = res.Mensaje;
+            porCancelar = null;
+            comprobante = null;
+            await Cargar();
+        }
+        catch (ApiException ex) { error = ex.Message; porCancelar = null; }
+        finally { cancelando = false; }
+    }
+
+    private async Task VerComprobante(ReservaCliente r)
+    {
+        error = null;
+        try { comprobante = await Api.ComprobantePortalAsync(r.Comprobante!, Sesion.Documento ?? ""); }
+        catch (ApiException ex) { error = ex.Message; }
+    }
+}

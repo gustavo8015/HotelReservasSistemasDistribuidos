@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="Asistente del hotel">
+  <defs>
+    <radialGradient id="fondoM" cx="50%" cy="32%" r="80%">
+      <stop offset="0%" stop-color="#2F5A96"/>
+      <stop offset="100%" stop-color="#0B2A5B"/>
+    </radialGradient>
+  </defs>
+  <circle cx="80" cy="80" r="80" fill="url(#fondoM)"/>
+
+  <!-- globo de conversación -->
+  <path d="M38 40h84a14 14 0 0 1 14 14v46a14 14 0 0 1-14 14H72l-24 20v-20h-10a14 14 0 0 1-14-14V54a14 14 0 0 1 14-14z"
+        fill="#FFFFFF"/>
+  <path d="M38 40h84a14 14 0 0 1 14 14v10H24V54a14 14 0 0 1 14-14z" fill="#A16207"/>
+
+  <!-- monograma del hotel -->
+  <text x="80" y="98" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif"
+        font-size="46" font-weight="700" fill="#0B2A5B" letter-spacing="1">HR</text>
+</svg>

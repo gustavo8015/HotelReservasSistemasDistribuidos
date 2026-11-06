@@ -1,0 +1,393 @@
+@page "/reservar/{IdTipo:int}"
+@inject ApiClient Api
+@inject Sesion Sesion
+@inject NavigationManager Nav
+
+<PageTitle>Reservar · Hotel Reservas</PageTitle>
+
+@* CU-16 / RF21: el usuario final escribe su documento y su nombre, elige cómo paga, decide a dónde
+   quiere el comprobante y la pasarela simulada responde con el número de autorización. *@
+
+@if (resultado == null)
+{
+    <div class="encabezado"><h2>Reservar @(tipo?.Tipo ?? "habitación")</h2>
+        <span class="sub">Tres pasos: sus datos, el pago y el envío del comprobante. No necesita tener cuenta.</span></div>
+
+    <div class="pasos">
+        <div class="paso @(paso >= 1 ? "act" : "")"><span>1</span> Sus datos</div>
+        <div class="paso @(paso >= 2 ? "act" : "")"><span>2</span> Pago</div>
+        <div class="paso @(paso >= 3 ? "act" : "")"><span>3</span> Comprobante</div>
+    </div>
+
+    <div class="grid g21">
+        <div class="tarjeta">
+            @if (paso == 1)
+            {
+                <h3>Quién se hospeda</h3>
+                <div class="fila" style="margin-top:10px">
+                    <div class="campo" style="flex:0 0 120px"><label for="td">Documento</label>
+                        <select id="td" @bind="datos.TipoDocumento">
+                            <option value="CC">CC</option><option value="CE">CE</option>
+                            <option value="TI">TI</option><option value="PAS">Pasaporte</option>
+                        </select>
+                    </div>
+                    <div class="campo"><label for="nd">Número</label>
+                        <input id="nd" inputmode="numeric" autocomplete="off" value="@datos.NumeroDocumento" @onchange="BuscarHuesped" placeholder="1010101010" /></div>
+                </div>
+                @if (avisoHuesped != null) { <div class="nota info" role="status" style="margin-top:8px">@avisoHuesped</div> }
+                <div class="fila" style="margin-top:10px">
+                    <div class="campo"><label for="no">Nombres</label><input id="no" @bind="datos.Nombres" /></div>
+                    <div class="campo"><label for="ap">Apellidos</label><input id="ap" @bind="datos.Apellidos" /></div>
+                </div>
+                <div class="fila" style="margin-top:10px">
+                    <div class="campo"><label for="te">Teléfono (WhatsApp)</label><input id="te" type="tel" inputmode="tel" autocomplete="tel" @bind="datos.Telefono" placeholder="3001112233" /></div>
+                    <div class="campo"><label for="co">Correo</label><input id="co" type="email" @bind="datos.Correo" placeholder="nombre@@correo.com" /></div>
+                </div>
+                <label class="check" style="margin-top:12px">
+                    <input type="checkbox" @bind="datos.ExtranjeroNoResidente" />
+                    <span><b>Soy extranjero no residente</b><small>El alojamiento queda exento de IVA (artículo 481 del Estatuto Tributario). Se verifica el pasaporte en recepción.</small></span>
+                </label>
+
+                <h3 style="margin-top:18px">Su estadía</h3>
+                <div class="fila" style="margin-top:10px">
+                    <div class="campo"><label for="e1">Llegada</label><input id="e1" type="date" @bind="entrada" @bind:after="Recalcular" /></div>
+                    <div class="campo"><label for="s1">Salida</label><input id="s1" type="date" @bind="salida" @bind:after="Recalcular" /></div>
+                    <div class="campo"><label for="p1">Huéspedes</label>
+                        <select id="p1" @bind="personas" @bind:after="Recalcular">
+                            @for (var i = 1; i <= 4; i++) { <option value="@i">@i</option> }
+                        </select>
+                    </div>
+                </div>
+                @if (error != null) { <div class="nota error" role="alert" style="margin-top:12px">@error</div> }
+                <button class="btn primario" style="margin-top:14px" @onclick="IrAPago">Continuar al pago</button>
+            }
+            else if (paso == 2)
+            {
+                <h3>Cómo quiere pagar</h3>
+                <div class="medios" style="margin-top:10px">
+                    <label class="check @(medio == "TARJETA" ? "sel" : "")">
+                        <input type="radio" name="medio" checked="@(medio == "TARJETA")" @onchange='() => medio = "TARJETA"' />
+                        <span><b>Tarjeta de crédito o débito</b><small>El cobro se procesa en línea y recibe un número de autorización.</small></span>
+                    </label>
+                    <label class="check @(medio == "EFECTIVO" ? "sel" : "")">
+                        <input type="radio" name="medio" checked="@(medio == "EFECTIVO")" @onchange='() => medio = "EFECTIVO"' />
+                        <span><b>Efectivo en recepción</b><small>La habitación queda apartada @HorasPlazoPago horas y usted paga al llegar al hotel.</small></span>
+                    </label>
+                </div>
+
+                @if (medio == "EFECTIVO")
+                {
+                    @* El plazo se anuncia antes de reservar, no después: es la condición
+                       con la que el huésped acepta apartar sin pagar. *@
+                    <div class="nota aviso" style="margin-top:12px" role="status">
+                        <b>Tiene @HorasPlazoPago horas para pagar.</b>
+                        Si reserva ahora, la habitación le queda apartada hasta el
+                        @LimiteEstimado.ToString("dd 'de' MMMM", Cultura) a las @LimiteEstimado.ToString("HH:mm").
+                        Acérquese a recepción con su documento antes de esa hora. Si el plazo vence
+                        sin pago, la habitación se libera y la reserva se cancela sola.
+                    </div>
+                }
+
+                @if (medio == "TARJETA")
+                {
+                    <div class="plastico">
+                        <div class="franja"></div>
+                        <div class="numero mono">@NumeroVisible()</div>
+                        <div class="pie"><span>@(string.IsNullOrWhiteSpace(tarjeta.Titular) ? "NOMBRE DEL TITULAR" : tarjeta.Titular.ToUpperInvariant())</span><span>@(string.IsNullOrWhiteSpace(tarjeta.Vencimiento) ? "MM/AA" : tarjeta.Vencimiento)</span></div>
+                    </div>
+                    <div class="campo" style="margin-top:12px"><label for="tn">Número de la tarjeta</label>
+                        <input id="tn" class="mono" inputmode="numeric" autocomplete="cc-number" aria-describedby="ayuda-tarjeta" @bind="tarjeta.Numero" @bind:event="oninput" maxlength="19" placeholder="4111 1111 1111 1111" /></div>
+                    <div class="campo" style="margin-top:10px"><label for="tt">Titular</label>
+                        <input id="tt" autocomplete="cc-name" @bind="tarjeta.Titular" @bind:event="oninput" placeholder="Como aparece en la tarjeta" /></div>
+                    <div class="fila" style="margin-top:10px">
+                        <div class="campo"><label for="tv">Vencimiento</label><input id="tv" class="mono" inputmode="numeric" autocomplete="cc-exp" @bind="tarjeta.Vencimiento" @bind:event="oninput" maxlength="7" placeholder="12/29" /></div>
+                        <div class="campo"><label for="tc">Código de seguridad</label><input id="tc" class="mono" type="password" inputmode="numeric" autocomplete="cc-csc" @bind="tarjeta.Cvv" maxlength="4" placeholder="123" /></div>
+                    </div>
+                    <div class="nota info" id="ayuda-tarjeta" style="margin-top:10px">
+                        Del pago solo conservamos la franquicia, los cuatro últimos dígitos y el número de autorización.
+                        El número completo y el código de seguridad no quedan guardados en ninguna parte.
+                    </div>
+                }
+
+                @if (error != null) { <div class="nota error" role="alert" style="margin-top:12px">@error</div> }
+                <div style="display:flex;gap:8px;margin-top:14px">
+                    <button class="btn" @onclick="() => paso = 1">Volver</button>
+                    <button class="btn primario" @onclick="IrAComprobante">Continuar</button>
+                </div>
+            }
+            else
+            {
+                <h3>A dónde le enviamos el comprobante</h3>
+                <div class="medios" style="margin-top:10px">
+                    <label class="check @(canal == "CORREO" ? "sel" : "")">
+                        <input type="radio" name="canal" checked="@(canal == "CORREO")" @onchange='() => CambiarCanal("CORREO")' />
+                        <span><b>Correo electrónico</b><small>Le llega el comprobante en formato de texto, listo para imprimir.</small></span>
+                    </label>
+                    <label class="check @(canal == "WHATSAPP" ? "sel" : "")">
+                        <input type="radio" name="canal" checked="@(canal == "WHATSAPP")" @onchange='() => CambiarCanal("WHATSAPP")' />
+                        <span><b>WhatsApp</b><small>Recibe el mismo comprobante como mensaje en su teléfono.</small></span>
+                    </label>
+                </div>
+                <div class="campo" style="margin-top:12px">
+                    <label for="dst">@(canal == "CORREO" ? "Correo de destino" : "Número de WhatsApp")</label>
+                    <input id="dst" @bind="destino" placeholder="@(canal == "CORREO" ? EjemploCorreo : "3001112233")" />
+                </div>
+                @if (error != null) { <div class="nota error" role="alert" style="margin-top:12px">@error</div> }
+                <div style="display:flex;gap:8px;margin-top:14px">
+                    <button class="btn" @onclick="() => paso = 2">Volver</button>
+                    <button class="btn primario" @onclick="Pagar" disabled="@procesando">
+                        @(procesando ? "Procesando el pago…" : (medio == "TARJETA" ? "Pagar y reservar" : "Reservar y pagar en recepción"))
+                    </button>
+                </div>
+            }
+        </div>
+
+        <div class="tarjeta">
+            <h3>Su reserva</h3>
+            @if (tipo == null)
+            {
+                <p class="secundario" style="margin-top:10px">Cargando la tarifa…</p>
+            }
+            else
+            {
+                <div class="foto chica" style="margin-top:10px"><img src="@tipo.Imagen" alt="Habitación @tipo.Tipo" /></div>
+                <p style="margin:10px 0 2px"><b>@tipo.Tipo</b></p>
+                <p class="secundario" style="margin:0">@tipo.Descripcion</p>
+                <div class="resumen" style="margin-top:12px">
+                    <span class="k">Llegada</span><span class="v mono">@entrada.ToString("yyyy-MM-dd")</span>
+                    <span class="k">Salida</span><span class="v mono">@salida.ToString("yyyy-MM-dd")</span>
+                    <span class="k">Huéspedes</span><span class="v">@personas</span>
+                    <span class="k">@tipo.Noches noche@(tipo.Noches > 1 ? "s" : "") por @ApiClient.Moneda(tipo.TarifaNoche ?? 0)</span><span class="v">@ApiClient.Moneda(tipo.Subtotal)</span>
+                    <span class="k">IVA 19 %</span><span class="v">@(datos.ExtranjeroNoResidente ? "exento" : ApiClient.Moneda(tipo.Iva))</span>
+                    <span class="total k">Total a pagar</span><span class="total">@ApiClient.Moneda(datos.ExtranjeroNoResidente ? tipo.Subtotal : tipo.PrecioNeto)</span>
+                </div>
+                <p class="secundario" style="margin-top:12px">@(tipo.Libres == 1 ? "Queda 1 habitación libre" : $"Quedan {tipo.Libres} habitaciones libres") de este tipo en las fechas elegidas.</p>
+            }
+        </div>
+    </div>
+
+    @if (procesando)
+    {
+        <div class="velo-pago" role="status" aria-live="assertive" aria-busy="true">
+            <div class="caja-pago">
+                <div class="giro"></div>
+                <b>Contactando la entidad financiera…</b>
+                <span class="secundario">No cierre esta ventana. La habitación se confirma apenas se apruebe el pago.</span>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <div class="encabezado">
+        <h2>@(resultado.PendientePago ? "Reserva apartada" : "Reserva confirmada")</h2>
+        <span class="chip @(resultado.PendientePago ? "naranja" : "ok")">@resultado.Codigo</span>
+        <span class="sub">@(resultado.PendientePago ? resultado.AvisoPago : resultado.MensajePago)</span>
+    </div>
+
+    @if (resultado.PendientePago && resultado.LimitePago is DateTime limite)
+    {
+        @* Lo primero que ve el huésped es hasta cuándo puede pagar, porque es lo único
+           que tiene que hacer para que la reserva no se caiga. *@
+        <div class="nota aviso" role="status">
+            <b>Falta el pago.</b>
+            Tiene hasta el @limite.ToString("dddd d 'de' MMMM", Cultura) a las @limite.ToString("HH:mm")
+            para pagar @ApiClient.Moneda(resultado.PrecioNeto) en recepción, con el documento
+            @resultado.Documento. Pasada esa hora la habitación vuelve a quedar disponible
+            para otros huéspedes y esta reserva se cancela.
+        </div>
+    }
+
+    <div class="grid g21">
+        <div class="tarjeta">
+            <h3>@(resultado.PendientePago ? "Reserva " + resultado.Comprobante : "Comprobante " + resultado.Comprobante)</h3>
+            <div class="ticket" style="margin-top:10px"><pre>@resultado.Texto</pre></div>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                @if (resultado.Canal == "WHATSAPP" && resultado.EnlaceWhatsApp != null)
+                {
+                    <a class="btn wa" href="@resultado.EnlaceWhatsApp" target="_blank">Abrir el envío por WhatsApp</a>
+                }
+                @if (resultado.Canal == "CORREO" && resultado.EnlaceCorreo != null)
+                {
+                    <a class="btn azul" href="@resultado.EnlaceCorreo">Abrir el envío por correo</a>
+                }
+                <button class="btn" @onclick='() => Nav.NavigateTo("")'>Volver al inicio</button>
+            </div>
+            <p class="secundario" style="margin-top:10px">
+                El comprobante quedó registrado para enviarse por @(resultado.Canal == "CORREO" ? "correo" : "WhatsApp") a @resultado.Destino.
+            </p>
+        </div>
+
+        <div class="tarjeta">
+            <h3>@(resultado.PendientePago ? "Detalle por pagar" : "Detalle del pago")</h3>
+            <div class="resumen" style="margin-top:10px">
+                <span class="k">Medio</span><span class="v">@resultado.MedioPago</span>
+                @if (!string.IsNullOrEmpty(resultado.Autorizacion))
+                {
+                    <span class="k">Autorización</span><span class="v mono">@resultado.Autorizacion</span>
+                }
+                @if (!string.IsNullOrEmpty(resultado.UltimosCuatro))
+                {
+                    <span class="k">Tarjeta</span><span class="v mono">@resultado.Franquicia ****@resultado.UltimosCuatro</span>
+                }
+                <span class="k">Habitación</span><span class="v">@resultado.Habitacion · @resultado.Tipo</span>
+                <span class="k">Subtotal</span><span class="v">@ApiClient.Moneda(resultado.Subtotal)</span>
+                <span class="k">IVA</span><span class="v">@(resultado.ExentoIva ? "exento" : ApiClient.Moneda(resultado.Impuesto))</span>
+                <span class="total k">@(resultado.PendientePago ? "Por pagar" : "Pagado")</span><span class="total">@ApiClient.Moneda(resultado.PrecioNeto)</span>
+            </div>
+            @if (!Sesion.Activa)
+            {
+                <div class="nota info" style="margin-top:12px">
+                    Si crea una cuenta con este mismo documento podrá ver todas sus reservas y volver a enviar el comprobante cuando quiera.
+                    <br /><a class="btn chico" style="margin-top:8px" href="registro">Crear mi cuenta</a>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int IdTipo { get; set; }
+    [SupplyParameterFromQuery] public string? Entrada { get; set; }
+    [SupplyParameterFromQuery] public string? Salida { get; set; }
+    [SupplyParameterFromQuery] public int? Personas { get; set; }
+
+    private const string EjemploCorreo = "nombre@correo.com";
+    private int paso = 1;
+    private DateOnly entrada = DateOnly.FromDateTime(DateTime.Today).AddDays(1);
+    private DateOnly salida = DateOnly.FromDateTime(DateTime.Today).AddDays(3);
+    private int personas = 2;
+    private TipoCatalogo? tipo;
+    private DatosHuespedPortal datos = new();
+    private DatosTarjeta tarjeta = new();
+    /// <summary>
+    /// Mismo plazo que aplica la API en PortalController.HorasPlazoPago. Aquí solo sirve para
+    /// anunciarlo antes de reservar; la hora límite real la calcula y la guarda la base de datos.
+    /// </summary>
+    private const int HorasPlazoPago = 24;
+    private static readonly System.Globalization.CultureInfo Cultura = new("es-CO");
+    private DateTime LimiteEstimado => DateTime.Now.AddHours(HorasPlazoPago);
+
+    private string medio = "TARJETA", canal = "CORREO", destino = "";
+    private string? error, avisoHuesped;
+    private bool procesando;
+    private ResultadoReservaPortal? resultado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (DateOnly.TryParse(Entrada, out var e)) entrada = e;
+        if (DateOnly.TryParse(Salida, out var s)) salida = s;
+        if (Personas is > 0) personas = Personas.Value;
+        if (Sesion.EsCliente && !string.IsNullOrEmpty(Sesion.Documento))
+        {
+            datos.NumeroDocumento = Sesion.Documento!;
+            await BuscarPorDocumento(Sesion.Documento!);
+        }
+        await Recalcular();
+    }
+
+    private async Task Recalcular()
+    {
+        error = null;
+        if (salida <= entrada) { error = "La fecha de salida debe ser posterior a la de llegada."; return; }
+        try
+        {
+            var c = await Api.CatalogoAsync(entrada, salida, personas);
+            tipo = c.Tipos.FirstOrDefault(t => t.IdTipo == IdTipo);
+            if (tipo == null) error = "Ese tipo de habitación ya no está disponible.";
+            else if (!tipo.Cabe) error = $"La habitación {tipo.Tipo} admite máximo {tipo.Capacidad} persona(s).";
+            else if (tipo.Libres == 0) error = $"No quedan habitaciones {tipo.Tipo} libres en esas fechas.";
+        }
+        catch (ApiException ex) { error = ex.Message; }
+    }
+
+    private Task BuscarHuesped(ChangeEventArgs e)
+    {
+        datos.NumeroDocumento = (e.Value?.ToString() ?? "").Trim();
+        return BuscarPorDocumento(datos.NumeroDocumento);
+    }
+
+    private async Task BuscarPorDocumento(string documento)
+    {
+        avisoHuesped = null;
+        if (documento.Length < 5) return;
+        try
+        {
+            var h = await Api.HuespedPortalAsync(documento);
+            datos.TipoDocumento = h.TipoDocumento;
+            datos.Nombres = h.Nombres;
+            datos.Apellidos = h.Apellidos;
+            datos.Telefono = h.Telefono;
+            datos.Correo = h.Correo;
+            datos.ExtranjeroNoResidente = h.ExtranjeroNoResidente;
+            destino = h.Correo ?? "";
+            avisoHuesped = h.EsFrecuente
+                ? $"Bienvenido de nuevo, {h.Nombres}. Es su estadía número {h.Estadias + 1} con nosotros."
+                : $"Ya teníamos sus datos, {h.Nombres}. Verifíquelos antes de continuar.";
+        }
+        catch (ApiException) { avisoHuesped = null; }
+    }
+
+    private void CambiarCanal(string c)
+    {
+        canal = c;
+        destino = c == "CORREO" ? (datos.Correo ?? "") : (datos.Telefono ?? "");
+    }
+
+    private async Task IrAPago()
+    {
+        error = null;
+        if ((datos.NumeroDocumento ?? "").Trim().Length < 5) { error = "Escriba su número de documento."; return; }
+        if ((datos.Nombres ?? "").Trim().Length < 2) { error = "Escriba su nombre."; return; }
+        if (string.IsNullOrWhiteSpace(datos.Correo) && string.IsNullOrWhiteSpace(datos.Telefono))
+        { error = "Escriba al menos un correo o un teléfono para poder enviarle el comprobante."; return; }
+        await Recalcular();
+        if (error == null) paso = 2;
+    }
+
+    private void IrAComprobante()
+    {
+        error = null;
+        if (medio == "TARJETA")
+        {
+            if (new string((tarjeta.Numero ?? "").Where(char.IsDigit).ToArray()).Length < 13) { error = "Escriba el número completo de la tarjeta."; return; }
+            if ((tarjeta.Titular ?? "").Trim().Length < 5) { error = "Escriba el nombre del titular."; return; }
+            if ((tarjeta.Vencimiento ?? "").Length < 4) { error = "Escriba el vencimiento como MM/AA."; return; }
+            if ((tarjeta.Cvv ?? "").Length < 3) { error = "Escriba el código de seguridad."; return; }
+        }
+        if (string.IsNullOrWhiteSpace(destino)) destino = canal == "CORREO" ? (datos.Correo ?? "") : (datos.Telefono ?? "");
+        paso = 3;
+    }
+
+    private async Task Pagar()
+    {
+        error = null; procesando = true;
+        try
+        {
+            var s = new SolicitudReservaPortal
+            {
+                Huesped = datos,
+                IdTipo = IdTipo,
+                IdHabitacion = tipo?.IdHabitacionSugerida,
+                FechaEntrada = entrada,
+                FechaSalida = salida,
+                NumeroPersonas = personas,
+                MedioPago = medio,
+                Tarjeta = medio == "TARJETA" ? tarjeta : null,
+                CanalComprobante = canal,
+                DestinoComprobante = destino,
+            };
+            resultado = await Api.ReservarPortalAsync(s);
+        }
+        catch (ApiException ex) { error = ex.Message; }
+        finally { procesando = false; }
+    }
+
+    private string NumeroVisible()
+    {
+        var n = new string((tarjeta.Numero ?? "").Where(char.IsDigit).ToArray());
+        if (n.Length == 0) return "#### #### #### ####";
+        var relleno = n.PadRight(16, '#');
+        return string.Join(" ", Enumerable.Range(0, 4).Select(i => relleno.Substring(i * 4, 4)));
+    }
+}

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hotel Reservas Web</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+</head>
+<body>
+<style>
+/* Layout: barra lateral fija de navegación (recepción) + área de trabajo con cabecera; en móvil la barra pasa a pestañas inferiores. */
+:root{
+  --bg:#F4F6F9; --surface:#FFFFFF; --surface-2:#EDF1F6; --line:#D9E0E9; --fg:#15233B; --muted:#5E6E86;
+  --brand:#0B2A5B; --brand-ink:#FFFFFF; --accent:#1F6B3D; --accent-soft:#E6F3EB;
+  --warn:#B9690E; --warn-soft:#FFF3E0; --bad:#B42323; --bad-soft:#FBE9E9; --info-soft:#E3ECF8;
+  --wa:#1DA851; --shadow:0 8px 24px rgba(11,42,91,.08);
+  --font-ui:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --font-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --radius:12px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0F1726; --surface:#172238; --surface-2:#1E2B45; --line:#2C3A56; --fg:#E8EEF8; --muted:#9AA9C2;
+  --brand:#0B2A5B; --brand-ink:#FFFFFF; --accent:#4CC27B; --accent-soft:#163826;
+  --warn:#F0A94A; --warn-soft:#3B2A10; --bad:#F07878; --bad-soft:#3E1A1A; --info-soft:#1C2E4E; --shadow:0 8px 24px rgba(0,0,0,.35); color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0F1726; --surface:#172238; --surface-2:#1E2B45; --line:#2C3A56; --fg:#E8EEF8; --muted:#9AA9C2;
+  --brand:#0B2A5B; --brand-ink:#FFFFFF; --accent:#4CC27B; --accent-soft:#163826;
+  --warn:#F0A94A; --warn-soft:#3B2A10; --bad:#F07878; --bad-soft:#3E1A1A; --info-soft:#1C2E4E; --shadow:0 8px 24px rgba(0,0,0,.35); color-scheme:dark }
+
+*{box-sizing:border-box} html,body{height:100%} [hidden]{display:none!important} img{max-width:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:14px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;text-wrap:balance} h2{font-size:18px;font-weight:800} h3{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100%}
+/* barra lateral */
+.side{background:var(--brand);color:var(--brand-ink);padding:20px 14px;padding-left:max(14px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.logo{display:flex;align-items:center;gap:10px;padding:4px 8px 18px}
+.logo .mark{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.12);display:grid;place-items:center;font-weight:800}
+.logo b{display:block;font-size:15px} .logo small{color:#B9C7DE;font-size:11px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:#C8D4E8;font-weight:600}
+.nav button svg{width:18px;height:18px;flex:none;opacity:.9}
+.nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+.nav button.on{background:rgba(255,255,255,.16);color:#fff}
+.nav button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.side .foot{margin-top:auto;font-size:11.5px;color:#B9C7DE;line-height:1.5;padding:0 8px}
+.side .foot b{color:#fff}
+.side .foot .btn{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff}
+/* contenido */
+.main{min-width:0;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:14px;padding-block:14px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.top h2{flex:1} .top .sub{color:var(--muted);font-size:12.5px;font-weight:500}
+.content{padding-block:22px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+.view{display:none;flex-direction:column;gap:18px}.view.on{display:flex}
+.grid{display:grid;gap:14px}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g23{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;min-width:0}
+.card.pad0{padding:0;overflow:hidden}
+.kpi{display:flex;flex-direction:column;gap:4px}.kpi b{font-size:28px;font-weight:800;letter-spacing:-.02em}.kpi span{color:var(--muted);font-size:12.5px;font-weight:600}
+.kpi .bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-top:6px}.kpi .bar i{display:block;height:100%;background:var(--accent)}
+/* controles */
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}.field label{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.field input,.field select,.field textarea{height:40px;border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:0 11px;outline:none;width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.row>.field{flex:1 1 150px}
+.btn{height:40px;padding:0 16px;border-radius:9px;border:1px solid var(--line);background:var(--surface);font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn:hover{background:var(--surface-2)} .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.p{background:var(--accent);border-color:var(--accent);color:#fff}.btn.p:hover{filter:brightness(1.08)}
+.btn.b{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.w{background:var(--wa);border-color:var(--wa);color:#fff}
+.btn.sm{height:32px;padding:0 11px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.chip.ok{background:var(--accent-soft);color:var(--accent)}.chip.warn{background:var(--warn-soft);color:var(--warn)}.chip.bad{background:var(--bad-soft);color:var(--bad)}.chip.info{background:var(--info-soft);color:var(--brand)}
+:root[data-theme="dark"] .chip.info, :root:not([data-theme="light"]) .chip.info{color:inherit}
+.note{border-radius:10px;padding:10px 12px;font-size:13px}.note.ok{background:var(--accent-soft);color:var(--accent)}.note.warn{background:var(--warn-soft);color:var(--warn)}.note.bad{background:var(--bad-soft);color:var(--bad)}.note.info{background:var(--info-soft)}
+table{width:100%;border-collapse:collapse}th{text-align:left;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--surface-2)}td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}tr:last-child td{border-bottom:none}
+.tbl{overflow-x:auto}
+/* habitaciones */
+.rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.room{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;background:var(--surface);cursor:pointer;transition:transform .12s}
+.room:hover{transform:translateY(-2px);box-shadow:var(--shadow)}.room.off{cursor:default;opacity:.75}.room.off:hover{transform:none;box-shadow:none}
+.room b{font-size:17px}.room small{color:var(--muted)}.room .pr{font-weight:800;color:var(--accent)}
+.room.sel{outline:2px solid var(--accent)}
+/* resumen de confirmación */
+.sum{display:grid;grid-template-columns:1fr auto;gap:6px 14px;font-size:13.5px}.sum .k{color:var(--muted)}.sum .v{text-align:right;font-weight:600}.sum .tot{font-size:20px;font-weight:800;color:var(--accent);border-top:1px solid var(--line);padding-top:8px;margin-top:4px}.sum .tot.k{color:var(--fg);font-size:14px;align-self:center}
+.check{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px}.check input{width:18px;height:18px;margin-top:2px}
+.check b{display:block}.check small{color:var(--muted)}
+/* comprobante */
+.ticket{border:1px dashed var(--line);border-radius:12px;padding:16px;background:var(--surface-2)}
+.ticket pre{margin:0;white-space:pre-wrap;font-family:var(--font-mono);font-size:12.5px;line-height:1.5}
+/* chat */
+.chat{display:flex;flex-direction:column;gap:10px;max-height:52vh;overflow:auto;padding:4px}
+.msg{max-width:78%;padding:10px 14px;border-radius:14px;font-size:13.5px;line-height:1.45}.msg.me{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px}.msg.ia{align-self:flex-start;background:var(--surface-2);border-bottom-left-radius:4px}.msg small{display:block;color:var(--muted);font-size:11px;margin-top:6px}.msg.me small{color:#C8D4E8}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chips button{all:unset;cursor:pointer;font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:5px 11px;background:var(--surface)}.chips button:hover{border-color:var(--accent);color:var(--accent)}
+/* registro servidor */
+.drawer{position:fixed;right:0;bottom:0;width:min(560px,100vw);max-height:60vh;background:var(--surface);border:1px solid var(--line);border-right:none;border-bottom:none;border-radius:14px 0 0 0;box-shadow:var(--shadow);display:flex;flex-direction:column;max-height:44px;overflow:hidden;transition:max-height .2s;z-index:20;padding-right:env(safe-area-inset-right,0px)}
+.drawer.open{max-height:60vh}
+.drawer .hd{height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;cursor:pointer;font-weight:700;border-bottom:1px solid var(--line)}
+.drawer .hd .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.log{font-family:var(--font-mono);font-size:11.5px;line-height:1.5;padding:12px 14px;overflow:auto;white-space:pre-wrap;color:var(--fg)}
+.log .t{color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;box-shadow:var(--shadow);z-index:30;opacity:0;transition:opacity .2s;pointer-events:none}.toast.on{opacity:1}
+.hint{color:var(--muted);font-size:12.5px}
+.ver{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
+/* inicio de sesión */
+.login{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:40;padding:16px}
+.login .box{width:min(420px,100%);background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.login h1{font-size:22px;font-weight:800}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}.seg button{all:unset;cursor:pointer;padding:7px 12px;font-weight:700;font-size:12.5px;color:var(--muted)}.seg button.on{background:var(--brand);color:#fff}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;left:0;right:0;bottom:0;top:auto;height:auto;flex-direction:row;padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));z-index:15;gap:0}
+  .logo,.side .foot{display:none}
+  .nav{flex-direction:row;width:100%;justify-content:space-around}.nav button{flex-direction:column;gap:3px;font-size:10.5px;padding:6px 4px}
+  .content{padding-bottom:96px} .g3,.g4,.g2,.g23{grid-template-columns:1fr}
+  .drawer{bottom:calc(64px + env(safe-area-inset-bottom,0px));border-radius:14px 14px 0 0;width:100vw;border-left:none}
+  .top{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .content{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<!-- Inicio de sesión (CU-01) -->
+<div class="login" id="login">
+  <form class="box" id="loginForm">
+    <div class="logo" style="padding:0 0 4px"><div class="mark" style="background:var(--brand);color:#fff">HR</div><div><b>Hotel Reservas</b><small style="display:block;color:var(--muted)">Sistema transaccional · recepción</small></div></div>
+    <h1>Iniciar sesión</h1>
+    <div class="seg" id="modeSeg"><button type="button" class="on" data-m="demo">Demostración</button><button type="button" data-m="api">Conectar a la API</button></div>
+    <div class="field" id="apiUrlField" hidden><label for="apiUrl">URL de la API</label><input id="apiUrl" value="http://localhost:5080" placeholder="http://localhost:5080"></div>
+    <div class="field"><label for="correo">Correo</label><input id="correo" value="recepcion1@hotel.com" autocomplete="username"></div>
+    <div class="field"><label for="clave">Contraseña</label><input id="clave" type="password" value="Hotel2026*" autocomplete="current-password"></div>
+    <div class="note bad" id="loginErr" hidden></div>
+    <button class="btn p" type="submit" id="loginBtn">Entrar</button>
+    <div class="hint">Modo demostración: los datos del script 03 se simulan en el navegador. Modo API: se conecta a HotelReservas.Api (usuarios del script 06, contraseña Hotel2026*).</div>
+  </form>
+</div>
+
+<div class="app">
+<aside class="side">
+  <div class="logo"><div class="mark">HR</div><div><b>Hotel Reservas</b><small>Recepción · v0.3</small></div></div>
+  <nav class="nav" id="nav">
+    <button data-v="inicio" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Panel</button>
+    <button data-v="reservas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Reservas</button>
+    <button data-v="huespedes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Huéspedes</button>
+    <button data-v="habs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V7l9-4 9 4v14M9 21v-6h6v6"/></svg>Habitaciones</button>
+    <button data-v="hist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v5l3 2M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Historial</button>
+    <button data-v="ia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg>Asistente</button>
+  </nav>
+  <div class="foot"><b id="sesNombre">Recepcionista turno 1</b><br><span id="sesRol">RECEPCIONISTA</span> · <span id="sesModo">demostración</span><br><button class="btn sm" style="margin-top:8px" id="salir">Cerrar sesión</button></div>
+</aside>
+
+<main class="main">
+  <header class="top"><div><h2 id="title">Panel</h2><div class="sub" id="subtitle">Estado de hoy</div></div><span class="chip info" id="modoChip">Demostración</span></header>
+  <div class="content">
+
+  <!-- PANEL -->
+  <section class="view on" id="v-inicio">
+    <div class="grid g4" id="kpis"></div>
+    <div class="grid g23">
+      <div class="card"><h3>Llegadas de hoy y mañana</h3><div class="tbl" id="llegadas" style="margin-top:10px"></div></div>
+      <div class="card"><h3>Reserva rápida · huésped frecuente</h3>
+        <p class="hint" style="margin:8px 0 10px">Digite el documento: la app reconoce al huésped frecuente y precarga su última estadía.</p>
+        <div class="row"><div class="field"><label for="qDoc">Documento</label><input id="qDoc" placeholder="Ej. 2020202020"></div><button class="btn b" id="qBuscar">Buscar</button></div>
+        <div id="freqRes" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="card"><h3>Ocupación por piso</h3><div id="pisos" style="margin-top:10px;display:flex;flex-direction:column;gap:8px"></div></div>
+  </section>
+
+  <!-- RESERVAS -->
+  <section class="view" id="v-reservas">
+    <div class="card">
+      <h3>1 · Consultar disponibilidad (CU-03)</h3>
+      <div class="row" style="margin-top:10px">
+        <div class="field"><label for="fTipo">Tipo</label><select id="fTipo"><option>Doble</option><option>Sencilla</option><option>Suite</option></select></div>
+        <div class="field"><label for="fPers">Personas</label><select id="fPers"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+        <div class="field"><label for="fIn">Entrada</label><input type="date" id="fIn"></div>
+        <div class="field"><label for="fOut">Salida</label><input type="date" id="fOut"></div>
+        <button class="btn b" id="bBuscar">Buscar habitaciones</button>
+      </div>
+      <div id="resultados" style="margin-top:14px"></div>
+    </div>
+    <div class="grid g23" id="confWrap" hidden>
+      <div class="card">
+        <h3>2 · Confirmar reserva (CU-04, CU-05, CU-06)</h3>
+        <div class="row" style="margin-top:10px">
+          <div class="field" style="flex:2 1 220px"><label for="fHuesped">Huésped</label><select id="fHuesped"></select></div>
+          <div class="field"><label for="fMedio">Medio de pago</label><select id="fMedio"><option>TARJETA</option><option>EFECTIVO</option><option>TRANSFERENCIA</option></select></div>
+        </div>
+        <div id="freqTag" style="margin-top:8px"></div>
+        <label class="check" style="margin-top:12px"><input type="checkbox" id="fExento"><span><b>Huésped extranjero no residente</b><small>Alojamiento exento de IVA (art. 481 E.T.) · requiere pasaporte y tarjeta migratoria</small></span></label>
+        <div class="note warn" style="margin-top:12px">Al confirmar, la API vuelve a verificar la disponibilidad con bloqueo (SERIALIZABLE, UPDLOCK/HOLDLOCK) y registra en una sola transacción la reserva, el pago, el comprobante y la bitácora. Si otra sesión tomó la habitación, responde 409 y no se guarda nada.</div>
+        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn p" id="bConfirmar">Confirmar reserva</button><button class="btn" id="bCancelarSel">Cancelar</button></div>
+        <div id="confRes" style="margin-top:12px"></div>
+      </div>
+      <div class="card"><h3>Resumen y precio neto (RF16)</h3><div class="sum" id="resumen" style="margin-top:10px"></div></div>
+    </div>
+  </section>
+
+  <!-- HUÉSPEDES -->
+  <section class="view" id="v-huespedes">
+    <div class="grid g23">
+      <div class="card pad0"><div class="tbl" id="huList"></div></div>
+      <div class="card"><h3>Registrar huésped (CU-02)</h3>
+        <form id="huForm" style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+          <div class="row"><div class="field" style="flex:0 1 110px"><label for="hTipo">Tipo</label><select id="hTipo"><option>CC</option><option>CE</option><option>PA</option><option>TI</option></select></div><div class="field"><label for="hDoc">Documento</label><input id="hDoc" required></div></div>
+          <div class="row"><div class="field"><label for="hNom">Nombres</label><input id="hNom" required></div><div class="field"><label for="hApe">Apellidos</label><input id="hApe" required></div></div>
+          <div class="row"><div class="field"><label for="hTel">Teléfono (WhatsApp)</label><input id="hTel" placeholder="3001234567"></div><div class="field"><label for="hMail">Correo</label><input id="hMail" type="email"></div></div>
+          <label class="check"><input type="checkbox" id="hExt"><span><b>Extranjero no residente</b><small>Exento de IVA en alojamiento</small></span></label>
+          <button class="btn p" type="submit">Guardar huésped</button>
+          <div id="huMsg"></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- HABITACIONES -->
+  <section class="view" id="v-habs"><div id="habsList" style="display:flex;flex-direction:column;gap:16px"></div></section>
+
+  <!-- HISTORIAL -->
+  <section class="view" id="v-hist">
+    <div class="card pad0"><div class="tbl" id="histList"></div></div>
+    <div class="card"><h3>Bitácora de cambios (RNF05)</h3><div class="tbl" id="bitList" style="margin-top:10px"></div></div>
+  </section>
+
+  <!-- ASISTENTE -->
+  <section class="view" id="v-ia">
+    <div class="grid g23">
+      <div class="card">
+        <div class="chat" id="chat"><div class="msg ia">Hola. Puedo consultar disponibilidad, tarifas, el estado de una reserva y las llegadas del día. No creo ni modifico reservas.<small id="iaFuente">Funciones de solo lectura · intérprete: reglas (demostración)</small></div></div>
+        <div class="chips" style="margin:12px 0">
+          <button data-q="¿Qué habitaciones dobles hay libres del 16 al 18 de octubre?">Dobles libres 16-18 oct</button>
+          <button data-q="¿Cuánto cuesta una suite por 3 noches con IVA?">Precio neto suite 3 noches</button>
+          <button data-q="¿Cuántas reservas hay confirmadas?">Reservas confirmadas</button>
+          <button data-q="¿Cuántas llegadas tenemos mañana?">Llegadas de mañana</button>
+          <button data-q="Reserva la 103 para Laura Martínez">Reserva la 103</button>
+        </div>
+        <form id="iaForm" class="row"><div class="field" style="flex:1"><label for="q">Consulta</label><input id="q" placeholder="Escriba su consulta en lenguaje natural…" autocomplete="off"></div><button class="btn p" type="submit">Enviar</button></form>
+      </div>
+      <div class="card"><h3>Cómo funciona</h3>
+        <p class="hint" style="margin-top:8px">La consulta viaja a <span class="mono">POST /api/asistente</span>. El orquestador filtra datos personales, pide al modelo (Azure OpenAI GPT‑4o con llamada a funciones) la función a ejecutar, la valida contra el catálogo de solo lectura, la ejecuta sobre la base de datos y registra la consulta en CONSULTA_ASISTENTE. Sin credenciales de Azure, atiende el intérprete de reglas.</p>
+        <h3 style="margin-top:14px">Catálogo de funciones</h3>
+        <ul class="hint" style="margin:8px 0 0;padding-left:18px;line-height:1.7"><li class="mono">consultarDisponibilidad</li><li class="mono">consultarTarifa</li><li class="mono">consultarReserva</li><li class="mono">consultarLlegadas</li><li class="mono">consultarReservasConfirmadas</li></ul>
+      </div>
+    </div>
+  </section>
+
+  </div>
+</main>
+</div>
+
+<div class="drawer" id="drawer"><div class="hd" id="drawerHd"><span class="dot"></span>Servidor · API REST + SQL Server <span class="chip" id="srvKpi" style="margin-left:auto">0 solicitudes</span></div><div class="log" id="log">Esperando solicitudes…</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ================= Datos de demostración (coherentes con los scripts 03 y 05) =================
+const IVA=0.19;
+const tipos={1:{nombre:'Sencilla',cap:1,tarifa:120000},2:{nombre:'Doble',cap:2,tarifa:180000},3:{nombre:'Suite',cap:4,tarifa:350000}};
+const habs=[];const plan=[[1,1],[1,1],[1,2],[1,2],[1,3],[2,1],[2,1],[2,2],[2,2],[2,3],[3,1],[3,1],[3,2],[3,2],[3,3],[4,1],[4,1],[4,2],[4,2],[4,3],[5,1],[5,1],[5,2],[5,2],[5,3]];
+plan.forEach(([piso,tipo],i)=>{const n=piso*100+(i%5)+1;habs.push({id:i+1,numero:String(n),piso,tipo,estado:n===302?'MANTENIMIENTO':'DISPONIBLE'})});
+let huespedes=[{id:1,nombre:'Laura Martínez Pérez',tipoDoc:'CC',doc:'1010101010',tel:'573001234567',estadias:1,extranjero:false},
+ {id:2,nombre:'Carlos Gómez Rojas',tipoDoc:'CC',doc:'2020202020',tel:'573109876543',estadias:4,extranjero:false,ultima:{tipo:2,pers:2,medio:'TARJETA',hab:'204',noches:1,fecha:'2026-09-26'}},
+ {id:3,nombre:'Ana Silva Duarte',tipoDoc:'CE',doc:'3030303030',tel:'573157654321',estadias:2,extranjero:false,ultima:{tipo:3,pers:2,medio:'TRANSFERENCIA',hab:'105',noches:4,fecha:'2026-10-15'}},
+ {id:4,nombre:'John Walker Smith',tipoDoc:'PA',doc:'AB123456',tel:'13055550147',estadias:0,extranjero:true}];
+let reservas=[],bitacora=[],seq=44,conflictos=0,sel=null,pref=null,version=1,nreq=0;
+const hoy=new Date();const iso=d=>d.toISOString().slice(0,10);const HOY=iso(hoy);
+function calc(sub,ex){const iva=ex?0:Math.round(sub*IVA);return{sub,iva,neto:sub+iva}}
+function seed(){const d1=new Date(hoy);d1.setDate(d1.getDate()+1);const d2=new Date(hoy);d2.setDate(d2.getDate()+2);const d4=new Date(hoy);d4.setDate(d4.getDate()+4);
+ let t=calc(180000,false);reservas.push({id:1,codigo:'RSV000000043',hab:habByNum('204'),huesped:2,entrada:iso(d1),salida:iso(d2),pers:2,...t,valor:t.neto,exento:false,medio:'TARJETA',cmp:'CMP000000001',estado:'CONFIRMADA',ver:version++});
+ t=calc(1400000,false);reservas.push({id:2,codigo:'RSV000000044',hab:habByNum('105'),huesped:3,entrada:HOY,salida:iso(d4),pers:2,...t,valor:t.neto,exento:false,medio:'TRANSFERENCIA',cmp:'CMP000000002',estado:'EN_CASA',ver:version++});habByNum('105').estado='OCUPADA';
+ t=calc(120000,false);reservas.push({id:3,codigo:'RSV000000042',hab:habByNum('101'),huesped:1,entrada:HOY,salida:iso(d1),pers:1,...t,valor:t.neto,exento:false,medio:'EFECTIVO',cmp:'CMP000000003',estado:'CONFIRMADA',ver:version++});
+ bitacora.push({res:'RSV000000042',usuario:'recepcion2',de:'-',a:'CONFIRMADA',fecha:HOY+' 07:55'},{res:'RSV000000043',usuario:'recepcion2',de:'-',a:'CONFIRMADA',fecha:HOY+' 08:12'},{res:'RSV000000044',usuario:'recepcion1',de:'-',a:'CONFIRMADA',fecha:HOY+' 09:40'},{res:'RSV000000044',usuario:'recepcion1',de:'CONFIRMADA',a:'EN_CASA',fecha:HOY+' 14:05'})}
+function habByNum(n){return habs.find(h=>h.numero===n)}
+const fmt=v=>'$ '+Math.round(v).toLocaleString('es-CO');
+const noches=(a,b)=>Math.round((new Date(b)-new Date(a))/86400000);
+function solapa(h,ent,sal){return reservas.some(r=>r.hab.id===h.id&&['CONFIRMADA','EN_CASA'].includes(r.estado)&&r.entrada<sal&&r.salida>ent)}
+function hora(){const d=new Date();return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ================= Sesión y modo =================
+let modo='demo',apiUrl='',token='',usuario={nombre:'Recepcionista turno 1',rol:'RECEPCIONISTA'};
+document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');document.getElementById('apiUrlField').hidden=b.dataset.m!=='api'});
+document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();const err=document.getElementById('loginErr');err.hidden=true;
+ const m=document.querySelector('#modeSeg button.on').dataset.m;const btn=document.getElementById('loginBtn');btn.disabled=true;
+ try{
+  if(m==='api'){apiUrl=document.getElementById('apiUrl').value.replace(/\/$/,'');const r=await fetch(apiUrl+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({correo:document.getElementById('correo').value,clave:document.getElementById('clave').value})});
+   if(!r.ok){throw new Error(r.status===401?'Correo o contraseña incorrectos.':'La API respondió '+r.status)}const j=await r.json();token=j.token;usuario={nombre:j.nombre,rol:j.rol};modo='api'}
+  else{modo='demo';usuario={nombre:'Recepcionista turno 1',rol:'RECEPCIONISTA'}}
+  iniciar()
+ }catch(ex){err.textContent=m==='api'?('No fue posible conectar con la API ('+ex.message+'). Verifique que HotelReservas.Api esté en ejecución y que la URL sea correcta.'):ex.message;err.hidden=false}
+ btn.disabled=false});
+document.getElementById('salir').onclick=()=>{token='';document.getElementById('login').hidden=false};
+function iniciar(){document.getElementById('login').hidden=true;document.getElementById('sesNombre').textContent=usuario.nombre;document.getElementById('sesRol').textContent=usuario.rol;document.getElementById('sesModo').textContent=modo==='api'?'API '+apiUrl:'demostración';
+ const chip=document.getElementById('modoChip');chip.textContent=modo==='api'?'Conectado a la API':'Demostración';chip.className='chip '+(modo==='api'?'ok':'info');
+ log(modo==='api'?`POST /api/auth/login → 200 OK · token JWT (${usuario.rol})`:`[demo] sesión local · token JWT simulado (${usuario.rol})`);
+ if(modo==='api'){document.getElementById('iaFuente').textContent='Funciones de solo lectura · /api/asistente';api('GET','/api/asistente/estado').then(e=>{document.getElementById('iaFuente').textContent='Funciones de solo lectura · intérprete: '+e.interprete}).catch(()=>{})}
+ go('inicio')}
+async function api(metodo,ruta,cuerpo){nreq++;log(`${metodo} ${ruta}${cuerpo?' '+JSON.stringify(cuerpo):''}`);
+ const r=await fetch(apiUrl+ruta,{method:metodo,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:cuerpo?JSON.stringify(cuerpo):undefined});
+ const txt=await r.text();let j=null;try{j=txt?JSON.parse(txt):null}catch{}
+ log(`  ${r.status} ${r.statusText}`);if(!r.ok){const e=new Error((j&&(j.mensaje||j.title))||('HTTP '+r.status));e.status=r.status;e.body=j;throw e}return j}
+
+// ================= Navegación =================
+const titles={inicio:['Panel','Estado de hoy'],reservas:['Reservas','Consultar disponibilidad y confirmar · RF03, RF04, RF05, RF16'],huespedes:['Huéspedes','Registro y huésped frecuente · RF02, RF18'],habs:['Habitaciones','Inventario y estados · RF11'],hist:['Historial y bitácora','Trazabilidad · RF12, RNF05'],ia:['Asistente','Consultas en lenguaje natural · solo lectura']};
+function go(v){document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));document.getElementById('v-'+v).classList.add('on');document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));document.getElementById('title').textContent=titles[v][0];document.getElementById('subtitle').textContent=titles[v][1];
+ if(v==='inicio')panel();if(v==='habs')renderHabs();if(v==='hist')renderHist();if(v==='huespedes')renderHu();window.scrollTo({top:0})}
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+function log(t){const el=document.getElementById('log');if(el.textContent.startsWith('Esperando'))el.textContent='';el.innerHTML+=`<span class="t">${hora()}</span>  ${esc(t)}\n`;el.scrollTop=el.scrollHeight;document.getElementById('srvKpi').textContent=`${nreq} solicitudes`+(conflictos?` · ${conflictos} conflictos 409`:'')}
+document.getElementById('drawerHd').onclick=()=>document.getElementById('drawer').classList.toggle('open');
+let toastT;function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2600)}
+
+// ================= Panel =================
+async function panel(){
+ let lista=reservas;
+ if(modo==='api'){try{const r=await api('GET','/api/reservas');lista=r.map(x=>({codigo:x.codigo,estado:x.estado,hab:{numero:x.habitacion},huNombre:x.huesped,entrada:x.fechaEntrada,salida:x.fechaSalida,valor:x.precioNeto,pers:x.numeroPersonas,cmp:x.comprobante}))}catch(e){toast(e.message)}}
+ const ocu=habs.filter(h=>h.estado==='OCUPADA').length,man=habs.filter(h=>h.estado==='MANTENIMIENTO').length,conf=lista.filter(r=>r.estado==='CONFIRMADA').length,casa=lista.filter(r=>r.estado==='EN_CASA').length;
+ const dispo=habs.length-(modo==='api'?casa:ocu)-man;
+ const mañana=iso(new Date(hoy.getTime()+86400000));
+ const lleg=lista.filter(r=>r.estado==='CONFIRMADA'&&(r.entrada===HOY||r.entrada===mañana));
+ const ing=lista.filter(r=>['CONFIRMADA','EN_CASA'].includes(r.estado)).reduce((a,r)=>a+(r.valor||0),0);
+ document.getElementById('kpis').innerHTML=[['Habitaciones disponibles',dispo,habs.length,'accent'],['En casa',modo==='api'?casa:ocu,habs.length,'brand'],['Reservas confirmadas',conf,null,''],['Ingresos netos comprometidos',fmt(ing),null,'']].map(([k,v,tot,c])=>`<div class="card kpi"><b>${v}</b><span>${k}</span>${tot?`<div class="bar"><i style="width:${Math.round(v/tot*100)}%"></i></div>`:''}</div>`).join('');
+ document.getElementById('llegadas').innerHTML=lleg.length?`<table><tr><th>Fecha</th><th>Reserva</th><th>Hab.</th><th>Huésped</th><th>Pers.</th><th>Acción</th></tr>${lleg.map(r=>`<tr><td class="mono">${r.entrada}${r.entrada===HOY?' <span class="chip ok">hoy</span>':''}</td><td class="mono">${r.codigo}</td><td><b>${r.hab.numero}</b></td><td>${esc(r.huNombre||huespedes.find(h=>h.id===r.huesped)?.nombre||'')}</td><td>${r.pers}</td><td><button class="btn sm" onclick="checkin('${r.codigo}')">Check-in</button></td></tr>`).join('')}</table>`:'<div class="hint">Sin llegadas programadas.</div>';
+ document.getElementById('pisos').innerHTML=[1,2,3,4,5].map(p=>{const hs=habs.filter(h=>h.piso===p);return `<div style="display:flex;align-items:center;gap:10px"><span style="width:52px;font-weight:700">Piso ${p}</span><div style="display:flex;gap:4px;flex:1">${hs.map(h=>`<span title="Hab. ${h.numero} · ${h.estado}" style="flex:1;height:14px;border-radius:4px;background:${h.estado==='OCUPADA'?'var(--brand)':h.estado==='MANTENIMIENTO'?'var(--muted)':'var(--accent-soft)'};border:1px solid var(--line)"></span>`).join('')}</div><span class="hint" style="width:120px;text-align:right">${hs.filter(h=>h.estado==='DISPONIBLE').length} disponibles</span></div>`}).join('')}
+
+// ================= Huésped frecuente (RF18) =================
+document.getElementById('qBuscar').onclick=frecuente;document.getElementById('qDoc').addEventListener('keydown',e=>{if(e.key==='Enter')frecuente()});
+async function frecuente(){const d=document.getElementById('qDoc').value.trim().replace(/\s/g,'');const out=document.getElementById('freqRes');if(!d){out.innerHTML='<div class="note bad">Digite el número de documento.</div>';return}
+ let h;
+ if(modo==='api'){try{const j=await api('GET','/api/huespedes?documento='+encodeURIComponent(d));h={id:j.idHuesped,nombre:j.nombres+' '+j.apellidos,estadias:j.estadias,ultima:j.ultimaEstadia?{tipo:j.ultimaEstadia.idTipo,tipoNombre:j.ultimaEstadia.tipo,pers:j.ultimaEstadia.personas,medio:j.ultimaEstadia.medioPago,hab:j.ultimaEstadia.habitacion,noches:j.ultimaEstadia.noches}:null}}catch(e){out.innerHTML=`<div class="note bad">${e.status===404?'Documento no registrado. Regístrelo en Huéspedes.':esc(e.message)}</div>`;return}}
+ else{nreq++;log(`GET /api/huespedes?documento=${d} → SELECT HUESPED + últimas RESERVA/PAGO`);h=huespedes.find(x=>x.doc===d);if(!h){out.innerHTML='<div class="note bad">Documento no registrado. Regístrelo en Huéspedes.</div>';log('  404 Not Found');return}log(`  200 OK · ${h.estadias} estadía(s)`)}
+ if(h.estadias<2||!h.ultima){out.innerHTML=`<div class="note warn"><b>${esc(h.nombre)}</b> · ${h.estadias} estadía${h.estadias!==1?'s':''}. Aún no es huésped frecuente.</div><button class="btn sm" style="margin-top:8px" onclick="go('reservas')">Nueva reserva</button>`;return}
+ const u=h.ultima;const tn=u.tipoNombre||tipos[u.tipo].nombre;
+ out.innerHTML=`<div class="note ok">★ <b>${esc(h.nombre)}</b> · huésped frecuente (${h.estadias} estadías)<br>Última estadía: hab. ${u.hab} ${tn}, ${u.noches} noche${u.noches>1?'s':''}, ${u.pers} personas · pago ${u.medio}</div><button class="btn p" style="margin-top:10px;width:100%" id="bRep">Repetir última estadía (1 toque)</button>`;
+ document.getElementById('bRep').onclick=()=>{pref={huesped:h.id,medio:u.medio,nombre:h.nombre};document.getElementById('fTipo').value=tn;document.getElementById('fPers').value=u.pers;const e=new Date(hoy.getTime()+86400000);const s=new Date(e.getTime()+u.noches*86400000);document.getElementById('fIn').value=iso(e);document.getElementById('fOut').value=iso(s);go('reservas');buscar(true)}}
+
+// ================= Disponibilidad (CU-03) =================
+document.getElementById('fIn').value=iso(new Date(hoy.getTime()+86400000));document.getElementById('fOut').value=iso(new Date(hoy.getTime()+3*86400000));
+document.getElementById('bBuscar').onclick=()=>buscar(false);
+async function buscar(precargado){const tipoN=document.getElementById('fTipo').value,pers=+document.getElementById('fPers').value,ent=document.getElementById('fIn').value,sal=document.getElementById('fOut').value;const out=document.getElementById('resultados');
+ const tipoId=+Object.keys(tipos).find(k=>tipos[k].nombre===tipoN);const n=noches(ent,sal);
+ if(!(n>0)){out.innerHTML='<div class="note bad">La fecha de salida debe ser posterior a la de entrada (restricción CK_RESERVA_fechas).</div>';return}
+ if(pers>tipos[tipoId].cap){out.innerHTML=`<div class="note bad">El tipo ${tipoN} admite máximo ${tipos[tipoId].cap} persona(s).</div>`;return}
+ let lista;
+ if(modo==='api'){try{const j=await api('GET',`/api/disponibilidad?tipo=${tipoN}&entrada=${ent}&salida=${sal}`);lista=j.map(x=>({id:x.idHabitacion,numero:x.numero,piso:x.piso,ok:x.disponible,estado:x.estado,neto:x.precioNeto,sub:x.subtotal}))}catch(e){out.innerHTML=`<div class="note bad">${esc(e.message)}</div>`;return}}
+ else{nreq++;log(`GET /api/disponibilidad?tipo=${tipoN}&entrada=${ent}&salida=${sal} → SELECT HABITACION h JOIN TARIFA … WHERE NOT EXISTS (reservas solapadas)`);lista=habs.filter(h=>h.tipo===tipoId).map(h=>{const man=h.estado==='MANTENIMIENTO',res=!man&&solapa(h,ent,sal);return{id:h.id,numero:h.numero,piso:h.piso,ok:!man&&!res,estado:man?'MANTENIMIENTO':res?'RESERVADA':'DISPONIBLE',sub:n*tipos[tipoId].tarifa,neto:calc(n*tipos[tipoId].tarifa).neto}});log(`  200 OK · ${lista.length} habitaciones evaluadas`)}
+ out.innerHTML=`${precargado?`<div class="note ok" style="margin-bottom:10px">Filtros precargados con las preferencias de <b>${esc(pref.nombre)}</b>. Al elegir la habitación, el huésped y su medio de pago ya estarán seleccionados.</div>`:''}<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:10px"><b>${tipoN} · ${n} noche${n>1?'s':''} · ${pers} persona${pers>1?'s':''}</b><span class="hint">Tarifa ${fmt(tipos[tipoId].tarifa)}/noche · precios netos con IVA 19 % incluido · ${lista.filter(h=>h.ok).length} disponibles</span></div><div class="rooms">${lista.map(h=>`<div class="room ${h.ok?'':'off'}" ${h.ok?`onclick="elegir(${h.id},'${h.numero}',${h.piso},${tipoId},'${ent}','${sal}',${pers},${h.sub})"`:''}><div style="display:flex;justify-content:space-between;align-items:center"><b>${h.numero}</b><span class="chip ${h.ok?'ok':h.estado==='MANTENIMIENTO'?'':'warn'}">${h.ok?'Disponible':h.estado==='MANTENIMIENTO'?'Mantenimiento':'Reservada'}</span></div><small>Piso ${h.piso} · ${tipoN}</small>${h.ok?`<span class="pr">${fmt(h.neto)}</span><small>neto · ${n} noche${n>1?'s':''}</small>`:''}</div>`).join('')}</div><div class="hint" style="margin-top:10px">Resultado calculado en el servidor con las reservas confirmadas y en casa. Haga clic en una habitación disponible para reservarla.</div>`;
+ document.getElementById('confWrap').hidden=true}
+
+async function elegir(id,numero,piso,tipoId,ent,sal,pers,sub){sel={id,numero,piso,tipo:tipoId,ent,sal,pers,n:noches(ent,sal),sub};
+ document.querySelectorAll('.room').forEach(r=>r.classList.toggle('sel',r.querySelector('b')?.textContent===numero));
+ const selH=document.getElementById('fHuesped');selH.innerHTML=huespedes.map(x=>`<option value="${x.id}">${esc(x.nombre)} · ${x.tipoDoc} ${x.doc}</option>`).join('');
+ if(pref){selH.value=pref.huesped;document.getElementById('fMedio').value=pref.medio}
+ huChange();document.getElementById('confRes').innerHTML='';document.getElementById('confWrap').hidden=false;document.getElementById('confWrap').scrollIntoView({behavior:'smooth',block:'start'})}
+document.getElementById('fHuesped').addEventListener('change',huChange);document.getElementById('fExento').addEventListener('change',recalc);
+function huChange(){const h=huespedes.find(x=>x.id==document.getElementById('fHuesped').value);if(!h)return;document.getElementById('fExento').checked=!!h.extranjero;document.getElementById('freqTag').innerHTML=h.estadias>=2?`<span class="chip ok">★ Huésped frecuente · ${h.estadias} estadías</span>`:'';recalc()}
+function recalc(){if(!sel)return;const ex=document.getElementById('fExento').checked;const t=calc(sel.sub,ex);sel.iva=t.iva;sel.valor=t.neto;sel.exento=ex;
+ document.getElementById('resumen').innerHTML=`<span class="k">Habitación</span><span class="v">${sel.numero} · ${tipos[sel.tipo].nombre}</span><span class="k">Entrada → salida</span><span class="v mono">${sel.ent} → ${sel.sal}</span><span class="k">Noches × tarifa</span><span class="v">${sel.n} × ${fmt(tipos[sel.tipo].tarifa)}</span><span class="k">Personas</span><span class="v">${sel.pers}</span><span class="k">Subtotal alojamiento</span><span class="v">${fmt(sel.sub)}</span><span class="k">IVA 19 % ${ex?'<span class="chip">exento</span>':''}</span><span class="v">${fmt(sel.iva)}</span><span class="k tot">Precio neto</span><span class="v tot">${fmt(sel.valor)}</span>`}
+document.getElementById('bCancelarSel').onclick=()=>{sel=null;pref=null;document.getElementById('confWrap').hidden=true;document.querySelectorAll('.room').forEach(r=>r.classList.remove('sel'))};
+
+// ================= Confirmación (CU-04/05/06, RF16, RF17) =================
+document.getElementById('bConfirmar').onclick=confirmar;
+async function confirmar(){if(!sel)return;const out=document.getElementById('confRes');const hu=+document.getElementById('fHuesped').value,medio=document.getElementById('fMedio').value,ex=document.getElementById('fExento').checked;const h=huespedes.find(x=>x.id===hu);
+ const btn=document.getElementById('bConfirmar');btn.disabled=true;
+ if(modo==='api'){try{const j=await api('POST','/api/reservas',{idHuesped:hu,idHabitacion:sel.id,fechaEntrada:sel.ent,fechaSalida:sel.sal,numeroPersonas:sel.pers,medioPago:medio,exentoIva:ex});
+   const r={codigo:j.codigo,cmp:j.comprobante,sub:j.subtotal,iva:j.impuesto,valor:j.precioNeto,exento:j.exentoIva,hab:{numero:sel.numero,tipo:sel.tipo},huesped:hu,entrada:sel.ent,salida:sel.sal,pers:sel.pers,medio,estado:'CONFIRMADA'};
+   let comp=null;try{comp=await api('GET',`/api/comprobantes/${j.comprobante}/compartir`)}catch{}
+   out.innerHTML=`<div class="note ok">✔ Reserva <b>${r.codigo}</b> confirmada · Comprobante <b>${r.cmp}</b> · precio neto ${fmt(r.valor)} · 201 Created</div>${cardCmp(r,comp)}`;toast('Reserva confirmada');pref=null}
+  catch(e){if(e.status===409){conflictos++;out.innerHTML=`<div class="note bad">✖ HTTP 409 · ${esc(e.message)} No se guardó ningún dato. Vuelva a consultar la disponibilidad.</div>`}else out.innerHTML=`<div class="note bad">${esc(e.message)}</div>`}
+  btn.disabled=false;return}
+ nreq++;log(`POST /api/reservas {hab:${sel.numero}, huesped:${hu}, ${sel.ent}→${sel.sal}, exentoIva:${ex}} → EXEC sp_ConfirmarReserva`);log('  SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; BEGIN TRANSACTION;');log(`  SELECT 1 FROM RESERVA WITH (UPDLOCK, HOLDLOCK) WHERE id_habitacion=${sel.id} AND estado IN ('CONFIRMADA','EN_CASA') AND fecha_entrada<'${sel.sal}' AND fecha_salida>'${sel.ent}'`);
+ const hb=habs.find(x=>x.id===sel.id);
+ if(solapa(hb,sel.ent,sel.sal)){conflictos++;log('  → existe solapamiento: ROLLBACK TRANSACTION; THROW 50001 "Habitación no disponible"');log('  409 Conflict · ninguna fila insertada');out.innerHTML=`<div class="note bad">✖ HTTP 409 · La habitación ${sel.numero} ya no está disponible para esas fechas. No se guardó ningún dato.</div>`;btn.disabled=false;return}
+ const t=calc(sel.sub,ex);const id=reservas.length+1;const cmp='CMP'+String(id).padStart(9,'0');
+ const r={id,codigo:'RSV'+String(++seq).padStart(9,'0'),hab:hb,huesped:hu,entrada:sel.ent,salida:sel.sal,pers:sel.pers,sub:t.sub,iva:t.iva,valor:t.neto,exento:ex,medio,cmp,estado:'CONFIRMADA',ver:version++};reservas.push(r);
+ bitacora.push({res:r.codigo,usuario:'recepcion1',de:'-',a:'CONFIRMADA',fecha:HOY+' '+hora()});h.estadias++;h.ultima={tipo:hb.tipo,pers:sel.pers,medio,hab:hb.numero,noches:sel.n};pref=null;
+ log(`  INSERT RESERVA(${r.codigo}, subtotal=${r.sub}, impuesto=${r.iva}${ex?' [exento]':''}, valor_total=${r.valor}) · INSERT PAGO(${medio}) · INSERT COMPROBANTE(${cmp}) · INSERT BITACORA_RESERVA`);log('  COMMIT TRANSACTION · 201 Created');
+ out.innerHTML=`<div class="note ok">✔ Reserva <b>${r.codigo}</b> confirmada · Comprobante <b>${cmp}</b> · precio neto ${fmt(r.valor)} · 201 Created</div>${cardCmp(r)}`;toast('Reserva confirmada');btn.disabled=false}
+function textoCmp(r){const h=huespedes.find(x=>x.id===r.huesped)||{nombre:r.huNombre||'',tipoDoc:'',doc:''};const n=noches(r.entrada,r.salida);return `🏨 *Hotel Reservas* · Comprobante ${r.cmp}\nReserva: ${r.codigo}\nHuésped: ${h.nombre} (${h.tipoDoc} ${h.doc})\nHabitación: ${r.hab.numero} · ${tipos[r.hab.tipo]?.nombre||''} · ${r.pers} persona${r.pers>1?'s':''}\nEntrada: ${r.entrada} · Salida: ${r.salida} (${n} noche${n>1?'s':''})\nSubtotal: ${fmt(r.sub)}\nIVA 19 %: ${r.exento?'exento (extranjero no residente)':fmt(r.iva)}\n*Precio neto: ${fmt(r.valor)}*\nPago: ${r.medio} · Estado: ${r.estado}\nPresente este comprobante en recepción. ¡Lo esperamos!`}
+function cardCmp(r,comp){const txt=comp?comp.texto:textoCmp(r);const h=huespedes.find(x=>x.id===r.huesped);const tel=comp?comp.telefono:(h?h.tel:'');const wa=comp?comp.enlaceWhatsApp:(tel?'https://wa.me/'+tel+'?text='+encodeURIComponent(txt):null);const id='c'+Math.random().toString(36).slice(2);
+ return `<div class="ticket" style="margin-top:12px"><h3>Comprobante ${r.cmp} · compartible (RF17)</h3><pre id="${id}" style="margin-top:8px">${esc(txt.replace(/\*/g,''))}</pre><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${wa?`<a class="btn w" href="${wa}" target="_blank" rel="noopener">Enviar por WhatsApp${tel?' · +'+tel:''}</a>`:''}<button class="btn" onclick="copiar('${id}')">Copiar texto</button></div></div>`}
+function copiar(id){const t=document.getElementById(id).textContent;const sel=()=>{const rg=document.createRange();rg.selectNodeContents(document.getElementById(id));const s=getSelection();s.removeAllRanges();s.addRange(rg);toast('Texto seleccionado: copie con Ctrl+C')};if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(()=>toast('Comprobante copiado')).catch(sel);else sel()}
+
+// ================= Huéspedes (CU-02) =================
+async function renderHu(){if(modo==='api'){/* la API no expone listado completo; se muestran los locales conocidos */}
+ document.getElementById('huList').innerHTML=`<table><tr><th>Huésped</th><th>Documento</th><th>Teléfono</th><th>Estadías</th><th>IVA</th></tr>${huespedes.map(h=>`<tr><td><b>${esc(h.nombre)}</b>${h.estadias>=2?' <span class="chip ok">★ frecuente</span>':''}</td><td class="mono">${h.tipoDoc} ${h.doc}</td><td class="mono">+${h.tel||'—'}</td><td>${h.estadias}</td><td>${h.extranjero?'<span class="chip">exento</span>':'19 %'}</td></tr>`).join('')}</table>`}
+document.getElementById('huForm').addEventListener('submit',async e=>{e.preventDefault();const g=id=>document.getElementById(id).value.trim();const msg=document.getElementById('huMsg');
+ const n={tipoDocumento:g('hTipo'),numeroDocumento:g('hDoc'),nombres:g('hNom'),apellidos:g('hApe'),telefono:g('hTel'),correo:g('hMail'),extranjeroNoResidente:document.getElementById('hExt').checked};
+ if(huespedes.some(h=>h.doc===n.numeroDocumento)){msg.innerHTML='<div class="note bad">Ya existe un huésped con ese documento (UQ_HUESPED_documento).</div>';return}
+ let id=huespedes.length+1;
+ if(modo==='api'){try{const j=await api('POST','/api/huespedes',n);id=j.idHuesped}catch(ex){msg.innerHTML=`<div class="note bad">${esc(ex.message)}</div>`;return}}else{nreq++;log(`POST /api/huespedes {${n.tipoDocumento} ${n.numeroDocumento}} → INSERT HUESPED · 201 Created`)}
+ let tel=n.telefono.replace(/\D/g,'');if(tel.length===10&&tel.startsWith('3'))tel='57'+tel;
+ huespedes.push({id,nombre:n.nombres+' '+n.apellidos,tipoDoc:n.tipoDocumento,doc:n.numeroDocumento,tel,estadias:0,extranjero:n.extranjeroNoResidente});
+ msg.innerHTML=`<div class="note ok">Huésped registrado con id ${id}.</div>`;e.target.reset();renderHu();toast('Huésped guardado')});
+
+// ================= Habitaciones =================
+function renderHabs(){document.getElementById('habsList').innerHTML=[1,2,3,4,5].map(p=>`<div class="card"><h3>Piso ${p}</h3><div class="rooms" style="margin-top:10px">${habs.filter(h=>h.piso===p).map(h=>`<div class="room off"><div style="display:flex;justify-content:space-between;align-items:center"><b>${h.numero}</b><span class="chip ${h.estado==='DISPONIBLE'?'ok':h.estado==='OCUPADA'?'info':''}">${h.estado}</span></div><small>${tipos[h.tipo].nombre} · ${tipos[h.tipo].cap} pers.</small><span class="pr">${fmt(tipos[h.tipo].tarifa)}<small style="color:var(--muted);font-weight:500"> /noche + IVA</small></span></div>`).join('')}</div></div>`).join('')}
+
+// ================= Historial y bitácora =================
+async function renderHist(){let lista=reservas.slice().reverse().map(r=>({...r,huNombre:huespedes.find(h=>h.id===r.huesped)?.nombre}));
+ if(modo==='api'){try{const j=await api('GET','/api/reservas');lista=j.map(x=>({codigo:x.codigo,estado:x.estado,hab:{numero:x.habitacion},huNombre:x.huesped,entrada:x.fechaEntrada,salida:x.fechaSalida,valor:x.precioNeto,iva:x.impuesto,exento:x.exentoIva,cmp:x.comprobante,ver:x.versionFila}))}catch(e){toast(e.message)}}
+ document.getElementById('histList').innerHTML=`<table><tr><th>Reserva</th><th>Hab.</th><th>Huésped</th><th>Fechas</th><th>Precio neto</th><th>Estado</th><th>Acciones</th></tr>${lista.map(r=>`<tr><td class="mono">${r.codigo}</td><td><b>${r.hab.numero}</b></td><td>${esc(r.huNombre||'')}</td><td class="mono">${r.entrada} → ${r.salida}</td><td class="mono">${fmt(r.valor)}<br><small class="hint">IVA ${r.exento?'exento':fmt(r.iva||0)}</small></td><td><span class="chip ${r.estado==='CONFIRMADA'?'ok':r.estado==='EN_CASA'?'info':r.estado==='CANCELADA'?'bad':''}">${r.estado}</span></td><td style="white-space:nowrap">${['CONFIRMADA','EN_CASA'].includes(r.estado)?`<button class="btn sm" onclick="verCmp('${r.cmp}','${r.codigo}')">Comprobante</button> `:''}${r.estado==='CONFIRMADA'?`<button class="btn sm" onclick="checkin('${r.codigo}')">Check-in</button> <button class="btn sm" onclick="cancelar('${r.codigo}')">Cancelar</button>`:r.estado==='EN_CASA'?`<button class="btn sm" onclick="checkout('${r.codigo}')">Check-out</button>`:''}</td></tr><tr id="cmp-${r.cmp}" hidden><td colspan="7"></td></tr>`).join('')||'<tr><td>Sin reservas.</td></tr>'}</table>`;
+ let bit=bitacora.slice().reverse();
+ document.getElementById('bitList').innerHTML=modo==='api'?'<div class="hint">En modo API la bitácora de cada reserva se consulta en GET /api/reservas/{codigo}.</div>':`<table><tr><th>Fecha</th><th>Reserva</th><th>Cambio</th><th>Usuario</th></tr>${bit.map(b=>`<tr><td class="mono">${b.fecha}</td><td class="mono">${b.res}</td><td>${b.de} → <b>${b.a}</b></td><td>${b.usuario}</td></tr>`).join('')}</table>`}
+async function verCmp(cmp,codigo){const row=document.getElementById('cmp-'+cmp);if(!row.hidden){row.hidden=true;return}
+ if(modo==='api'){try{const c=await api('GET',`/api/comprobantes/${cmp}/compartir`);row.firstElementChild.innerHTML=cardCmp({cmp,codigo,huesped:0},c)}catch(e){toast(e.message);return}}
+ else{const r=reservas.find(x=>x.codigo===codigo);row.firstElementChild.innerHTML=cardCmp(r)}row.hidden=false}
+async function cambiar(codigo,accion,nuevo){if(modo==='api'){try{await api('PUT',`/api/reservas/${codigo}/${accion}`,{versionFila:null,detalle:null});toast(`${codigo}: ${nuevo}`)}catch(e){toast(e.message)}renderHist();panel();return}
+ const r=reservas.find(x=>x.codigo===codigo);if(!r)return;nreq++;log(`PUT /api/reservas/${codigo}/${accion} → BEGIN TRAN; UPDATE RESERVA SET estado='${nuevo}' WHERE codigo='${codigo}' AND version_fila=0x${r.ver.toString(16).padStart(8,'0')}; INSERT BITACORA; COMMIT · 200 OK`);
+ bitacora.push({res:codigo,usuario:'recepcion1',de:r.estado,a:nuevo,fecha:HOY+' '+hora()});r.estado=nuevo;r.ver=version++;if(nuevo==='EN_CASA')r.hab.estado='OCUPADA';if(nuevo==='FINALIZADA')r.hab.estado='DISPONIBLE';toast(`${codigo}: ${nuevo}`);renderHist();panel()}
+const checkin=c=>cambiar(c,'checkin','EN_CASA'),checkout=c=>cambiar(c,'checkout','FINALIZADA'),cancelar=c=>cambiar(c,'cancelar','CANCELADA');
+
+// ================= Asistente =================
+document.querySelectorAll('.chips button').forEach(b=>b.onclick=()=>ask(b.dataset.q));
+document.getElementById('iaForm').addEventListener('submit',e=>{e.preventDefault();ask()});
+async function ask(t){const q=t||document.getElementById('q').value.trim();if(!q)return;document.getElementById('q').value='';const chat=document.getElementById('chat');chat.innerHTML+=`<div class="msg me">${esc(q)}</div>`;chat.scrollTop=1e6;
+ if(modo==='api'){try{const j=await api('POST','/api/asistente',{consulta:q});chat.innerHTML+=`<div class="msg ia">${esc(j.respuesta)}<small>Fuente: ${j.funcion||'(aclaración)'} · intérprete ${j.interprete} · ${j.duracionMs} ms</small></div>`}catch(e){chat.innerHTML+=`<div class="msg ia">No fue posible consultar al asistente: ${esc(e.message)}</div>`}chat.scrollTop=1e6;return}
+ const s=q.toLowerCase();let fn='',ans='';const tipo=s.includes('suite')?3:s.includes('sencilla')?1:2;const m=s.match(/(\d{1,2})\s*(?:al|a|-)\s*(\d{1,2})/);
+ if(/reserv(a|e|ar)\s+la|crea|confirma|modifica|cancela/.test(s)&&!/cu[aá]nt/.test(s)){fn='(ninguna: escritura no permitida)';ans='No puedo crear, modificar ni cancelar reservas desde el asistente. Para confirmarla con verificación de disponibilidad y comprobante, use la pantalla Reservas.'}
+ else if(/llegada|llegan/.test(s)){const f=iso(new Date(hoy.getTime()+(s.includes('hoy')?0:86400000)));const l=reservas.filter(r=>r.estado==='CONFIRMADA'&&r.entrada===f);fn=`consultarLlegadas(${f})`;ans=`Para el ${f} hay <b>${l.length} llegada${l.length!==1?'s':''}</b>${l.length?': '+l.map(r=>`${r.codigo} hab. ${r.hab.numero} (${huespedes.find(h=>h.id===r.huesped)?.nombre.split(' ')[0]})`).join('; '):''}.`}
+ else if(/cu[aá]nt(o|a)s? .*(reserva|confirmad)/.test(s)){fn='consultarReservasConfirmadas()';const n=reservas.filter(r=>r.estado==='CONFIRMADA').length;ans=`Hay <b>${n} reserva${n!==1?'s':''} confirmada${n!==1?'s':''}</b> y ${reservas.filter(r=>r.estado==='EN_CASA').length} huésped(es) en casa.`}
+ else if(/cu[aá]nto|precio|cuesta|tarifa|vale/.test(s)){const nn=+(s.match(/(\d+)\s*noche/)||[0,1])[1];const t=calc(tipos[tipo].tarifa*nn);fn=`consultarTarifa(${tipos[tipo].nombre}, ${nn})`;ans=`Tarifa vigente <b>${tipos[tipo].nombre}</b>: ${fmt(tipos[tipo].tarifa)} por noche. Por ${nn} noche${nn>1?'s':''}: subtotal ${fmt(t.sub)} + IVA 19 % ${fmt(t.iva)} = <b>precio neto ${fmt(t.neto)}</b>. Extranjero no residente: exento, pagaría ${fmt(t.sub)}.`}
+ else if(/libre|disponib|hay/.test(s)){const y=hoy.getFullYear(),mo=String(hoy.getMonth()+1).padStart(2,'0');const ent=m?`${y}-${mo}-${m[1].padStart(2,'0')}`:iso(new Date(hoy.getTime()+86400000)),sal=m?`${y}-${mo}-${m[2].padStart(2,'0')}`:iso(new Date(hoy.getTime()+3*86400000));fn=`consultarDisponibilidad(${tipos[tipo].nombre}, ${ent}, ${sal})`;const libres=habs.filter(h=>h.tipo===tipo&&h.estado!=='MANTENIMIENTO'&&!solapa(h,ent,sal));const oc=habs.filter(h=>h.tipo===tipo&&!libres.includes(h));ans=`Del ${ent} al ${sal} hay <b>${libres.length} habitación${libres.length!==1?'es':''} ${tipos[tipo].nombre.toLowerCase()} disponible${libres.length!==1?'s':''}</b>: ${libres.map(h=>h.numero).join(', ')||'ninguna'}. Precio neto por noche ${fmt(calc(tipos[tipo].tarifa).neto)}.${oc.length?` No disponibles: ${oc.map(h=>h.numero+(h.estado==='MANTENIMIENTO'?' (mantenimiento)':' (reservada)')).join(', ')}.`:''}`}
+ else{fn='(aclaración)';ans='¿Podría indicarme el tipo de habitación y las fechas? Por ejemplo: "¿qué dobles hay libres del 16 al 18?"'}
+ nreq++;log(`POST /api/asistente "${q}" → intérprete REGLAS → ${fn} → INSERT CONSULTA_ASISTENTE`);
+ setTimeout(()=>{chat.innerHTML+=`<div class="msg ia">${ans}<small>Fuente: ${esc(fn)} · intérprete REGLAS · datos del repositorio central</small></div>`;chat.scrollTop=1e6},350)}
+
+// ================= Arranque =================
+seed();panel();renderHabs();
+</script>
+
+</body>
+</html>

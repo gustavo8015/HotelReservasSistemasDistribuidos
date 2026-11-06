@@ -1,0 +1,32 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Hotel Reservas</title>
+    <base href="/" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="Hotel Reservas: consulte habitaciones, reserve en línea y reciba su comprobante por correo o WhatsApp." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Tipografía de marca. Si el equipo está sin internet, el sistema usa Georgia y Segoe UI,
+         que están declaradas como alternativa en app.css, y la aplicación se ve igual de ordenada. -->
+    <link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;600;700&family=Playfair+Display+SC:wght@400;700&display=swap" rel="stylesheet" />
+    <link href="css/app.css?v=7" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+</head>
+<body>
+    <div id="app">
+        <div class="cargando" role="status" aria-live="polite"><div class="marca">HR</div><p>Cargando Hotel Reservas…</p></div>
+    </div>
+    <div id="blazor-error-ui">
+        Ocurrió un error inesperado. <a href="" class="reload">Recargar</a> <a class="dismiss" href="#" role="button" aria-label="Cerrar el aviso">Cerrar</a>
+    </div>
+    <script>
+        // Única función de JavaScript de la aplicación: deja el chat del asistente mostrando
+        // el último mensaje. Blazor no tiene forma de desplazar un elemento sin interoperar.
+        window.hrFinDelChat = function (el) { if (el) { el.scrollTop = el.scrollHeight; } };
+    </script>
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+</html>

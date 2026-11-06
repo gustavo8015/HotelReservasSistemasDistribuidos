@@ -1,0 +1,289 @@
+@page "/"
+@inject ApiClient Api
+@inject Sesion Sesion
+@inject NavigationManager Nav
+
+<PageTitle>Hotel Reservas · Reserve en línea</PageTitle>
+
+@* CU-16 / RF21: vitrina pública. Cualquier visitante ve las habitaciones con su foto y su precio
+   para las fechas que elija, sin necesidad de tener cuenta. *@
+
+<div class="portada">
+    <img src="img/habitaciones/portada.jpg" width="1400" height="778" fetchpriority="high" alt="Fachada del hotel al anochecer, con las arcadas iluminadas de la entrada" />
+    <div class="texto">
+        <div class="k">HOTEL RESERVAS</div>
+        <h1>Reserve su habitación en línea</h1>
+        <p>Elija las fechas, mire las habitaciones disponibles con su precio y pague en efectivo o con tarjeta. El comprobante le llega por correo o por WhatsApp.</p>
+    </div>
+</div>
+
+<div class="tarjeta">
+    <div class="fila">
+        <div class="campo"><label for="ent">Llegada</label><input id="ent" type="date" @bind="entrada" /></div>
+        <div class="campo"><label for="sal">Salida</label><input id="sal" type="date" @bind="salida" /></div>
+        <div class="campo"><label for="per">Huéspedes</label>
+            <select id="per" @bind="personas">
+                @for (var i = 1; i <= 4; i++) { <option value="@i">@i persona@(i > 1 ? "s" : "")</option> }
+            </select>
+        </div>
+        <button class="btn primario" @onclick="Buscar" disabled="@cargando">@(cargando ? "Buscando…" : "Ver disponibilidad")</button>
+    </div>
+    @if (error != null) { <div class="nota error" role="alert" style="margin-top:10px">@error</div> }
+</div>
+
+@if (catalogo != null)
+{
+    <div class="encabezado"><h2>Habitaciones disponibles</h2>
+        <span class="chip">@catalogo.Noches noche@(catalogo.Noches > 1 ? "s" : "") · @catalogo.Entrada.ToString("yyyy-MM-dd") al @catalogo.Salida.ToString("yyyy-MM-dd")</span>
+        <span class="sub" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            @if (verTodos)
+            {
+                <span>Está viendo todos los tipos de habitación.</span>
+                <button class="btn chico" @onclick="() => verTodos = false">Ver solo las de @Personas(catalogo.Personas)</button>
+            }
+            else if (HayAlgunaQueAlcance)
+            {
+                <span>Habitaciones para @Personas(catalogo.Personas).</span>
+                <button class="btn chico" @onclick="() => verTodos = true">Ver todos los tipos</button>
+            }
+            else
+            {
+                <span>Ninguna habitación admite @Personas(catalogo.Personas): estas son todas las que ofrece el hotel.</span>
+            }
+        </span>
+    </div>
+
+    <div class="catalogo">
+        @foreach (var t in TiposMostrados)
+        {
+            <div class="hcard">
+                <a class="foto enlace" href="@EnlaceFicha(t)" aria-label="Ver la habitación @t.Tipo">
+                    <img src="@t.Imagen" width="1600" height="1000" loading="lazy" alt="Habitación @t.Tipo" />
+                    <span class="etiqueta">@t.Tipo</span>
+                    @if (t.Libres == 0) { <span class="velo">Sin cupo en estas fechas</span> }
+                </a>
+                <div class="cuerpo">
+                    <div class="titulo">
+                        <b>@t.Tipo</b>
+                        @if (t.HayTarifa) { <span class="precio">@ApiClient.Moneda(t.TarifaNoche ?? 0)<small> por noche</small></span> }
+                    </div>
+                    <p class="secundario" style="margin:0">@t.Descripcion</p>
+                    <div class="datos">
+                        <span>@(t.Capacidad == 1 ? "Para 1 persona" : $"Hasta {t.Capacidad} personas")</span>
+                        <span>@(t.Libres == 1 ? "1 habitación libre" : $"{t.Libres} habitaciones libres")</span>
+                    </div>
+                    @if (t.HayTarifa)
+                    {
+                        <div class="resumen">
+                            <span class="k">@catalogo.Noches noche@(catalogo.Noches > 1 ? "s" : "")</span><span class="v">@ApiClient.Moneda(t.Subtotal)</span>
+                            <span class="k">IVA 19 %</span><span class="v">@ApiClient.Moneda(t.Iva)</span>
+                            <span class="total k">Total</span><span class="total">@ApiClient.Moneda(t.PrecioNeto)</span>
+                        </div>
+                    }
+                    @if (t.Disponible)
+                    {
+                        <a class="btn primario" href="@EnlaceFicha(t)">Ver la habitación</a>
+                    }
+                    else if (!t.Cabe)
+                    {
+                        <a class="btn" href="@EnlaceFicha(t)">Ver la habitación · admite @(t.Capacidad == 1 ? "1 persona" : t.Capacidad + " personas")</a>
+                    }
+                    else
+                    {
+                        <a class="btn" href="@EnlaceFicha(t)">Ver la habitación · sin cupo en estas fechas</a>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<h3>¿Ya reservó?</h3>
+<div class="tarjeta">
+    <p class="secundario" style="margin:0 0 10px">Consulte o vuelva a enviar su comprobante con el número que recibió y su documento.</p>
+    <div class="fila">
+        <div class="campo"><label for="cmp">Número de comprobante</label><input id="cmp" @ref="campoCmp" placeholder="Ejemplo: CMP000000012" autocomplete="off" spellcheck="false" aria-invalid="@(faltaCmp ? "true" : "false")" @bind="numeroComprobante" /></div>
+        <div class="campo"><label for="doc">Documento</label><input id="doc" @ref="campoDoc" placeholder="Ejemplo: 1010101010" inputmode="numeric" autocomplete="off" spellcheck="false" aria-invalid="@(faltaDoc ? "true" : "false")" @bind="documentoConsulta" /></div>
+        <button class="btn" @onclick="BuscarComprobante" disabled="@buscandoCmp">@(buscandoCmp ? "Buscando…" : "Consultar")</button>
+    </div>
+    @if (errorCmp != null) { <div class="nota error" role="alert" style="margin-top:10px">@errorCmp</div> }
+    @if (avisoCmp != null) { <div class="nota ok" role="status" style="margin-top:10px">@avisoCmp</div> }
+
+    @if (comprobante != null)
+    {
+        @if (comprobante.Estado == "PENDIENTE" && comprobante.LimitePago is DateTime limite)
+        {
+            <div class="nota aviso" role="status" style="margin-top:12px">
+                <b>Esta reserva todavía no está pagada.</b>
+                Tiene hasta el @limite.ToString("dddd d 'de' MMMM", Cultura) a las @limite.ToString("HH:mm")
+                para pagar @ApiClient.Moneda(comprobante.PrecioNeto) en recepción. Después la habitación se libera.
+            </div>
+        }
+
+        <div class="ticket" style="margin-top:12px"><pre>@comprobante.Texto</pre></div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            @if (comprobante.EnlaceWhatsApp != null) { <a class="btn wa" href="@comprobante.EnlaceWhatsApp" target="_blank">Enviar por WhatsApp</a> }
+            @if (comprobante.EnlaceCorreo != null) { <a class="btn" href="@comprobante.EnlaceCorreo">Enviar por correo</a> }
+
+            @* Cancelar sin tener cuenta: la API vuelve a exigir el documento con el que se reservó. *@
+            @if (comprobante.PuedeCancelar && !confirmandoCancelacion)
+            {
+                <button class="btn" @onclick="() => confirmandoCancelacion = true">Cancelar esta reserva</button>
+            }
+        </div>
+
+        @if (!comprobante.PuedeCancelar && !string.IsNullOrEmpty(comprobante.MotivoCancelacion))
+        {
+            <p class="secundario" style="margin-top:10px">@comprobante.MotivoCancelacion</p>
+        }
+
+        @if (confirmandoCancelacion)
+        {
+            <div class="nota aviso" style="margin-top:10px">
+                <b>¿Cancela la reserva @comprobante.Codigo?</b>
+                @(comprobante.Estado == "PENDIENTE"
+                    ? " Todavía no ha pagado, así que no hay devolución pendiente."
+                    : " Si pagó con tarjeta, el valor se devuelve a la misma tarjeta.")
+                Esta acción no se puede deshacer.
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+                    <button class="btn chico" style="background:var(--danger);border-color:var(--danger);color:#fff"
+                            disabled="@cancelandoCmp" @onclick="CancelarDesdeComprobante">
+                        @(cancelandoCmp ? "Cancelando…" : "Sí, cancelar")
+                    </button>
+                    <button class="btn chico" disabled="@cancelandoCmp" @onclick="() => confirmandoCancelacion = false">No, conservarla</button>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private DateOnly entrada = DateOnly.FromDateTime(DateTime.Today).AddDays(1);
+    private DateOnly salida = DateOnly.FromDateTime(DateTime.Today).AddDays(3);
+    private int personas = 2;
+    private Catalogo? catalogo;
+    private string? error;
+    private bool cargando;
+    private bool verTodos;
+
+    private static string Personas(int n) => n == 1 ? "1 persona" : $"{n} personas";
+
+    /// <summary>true cuando al menos un tipo de habitación alcanza para el número de huéspedes pedido.</summary>
+    private bool HayAlgunaQueAlcance => catalogo != null && catalogo.Tipos.Any(t => t.Capacidad >= catalogo.Personas);
+
+    /// <summary>
+    /// Tipos que se muestran en el catálogo. Por defecto solo los que corresponden al número de
+    /// huéspedes elegido: los de menor capacidad entre los que alcanzan, de modo que pedir una
+    /// persona muestra la Sencilla y pedir tres muestra la Cuádruple, sin ofrecer habitaciones de más.
+    /// El botón "Ver todos los tipos" levanta el filtro cuando el huésped quiere comparar.
+    /// </summary>
+    private IEnumerable<TipoCatalogo> TiposMostrados
+    {
+        get
+        {
+            if (catalogo == null) return Enumerable.Empty<TipoCatalogo>();
+            if (verTodos || !HayAlgunaQueAlcance) return catalogo.Tipos;
+            var alcanzan = catalogo.Tipos.Where(t => t.Capacidad >= catalogo.Personas).ToList();
+            var menor = alcanzan.Min(t => t.Capacidad);
+            return alcanzan.Where(t => t.Capacidad == menor);
+        }
+    }
+
+    private string numeroComprobante = "", documentoConsulta = "";
+    private ComprobantePortal? comprobante;
+    private string? errorCmp;
+    private bool buscandoCmp;
+
+    /// <summary>
+    /// Fechas y número de huéspedes vienen en la dirección. Así el botón "Volver al
+    /// catálogo" de la ficha devuelve al huésped a la misma búsqueda que traía, y la
+    /// dirección se puede compartir o guardar como favorito.
+    /// </summary>
+    [SupplyParameterFromQuery] public string? Entrada { get; set; }
+    [SupplyParameterFromQuery] public string? Salida { get; set; }
+    [SupplyParameterFromQuery(Name = "personas")] public int? Huespedes { get; set; }
+
+    protected override Task OnInitializedAsync()
+    {
+        if (DateOnly.TryParse(Entrada, out var e)) entrada = e;
+        if (DateOnly.TryParse(Salida, out var s)) salida = s;
+        if (Huespedes is > 0) personas = Huespedes.Value;
+        if (salida <= entrada) salida = entrada.AddDays(1);
+        return Buscar();
+    }
+
+    private async Task Buscar()
+    {
+        error = null; cargando = true; verTodos = false;
+        // La dirección refleja la consulta en curso, sin agregar una entrada al historial.
+        Nav.NavigateTo($"/?entrada={entrada:yyyy-MM-dd}&salida={salida:yyyy-MM-dd}&personas={personas}", replace: true);
+        try { catalogo = await Api.CatalogoAsync(entrada, salida, personas); }
+        catch (ApiException ex) { error = ex.Message; catalogo = null; }
+        finally { cargando = false; }
+    }
+
+    /// <summary>
+    /// El catálogo no reserva directamente: lleva a la ficha, donde está la galería y el detalle.
+    /// Es un enlace de verdad, de modo que se puede abrir en otra pestaña o copiar la dirección.
+    /// </summary>
+    private string EnlaceFicha(TipoCatalogo t) =>
+        $"habitacion/{t.IdTipo}?entrada={entrada:yyyy-MM-dd}&salida={salida:yyyy-MM-dd}&personas={personas}";
+
+    private static readonly System.Globalization.CultureInfo Cultura = new("es-CO");
+    private bool confirmandoCancelacion;
+    private bool cancelandoCmp;
+    private string? avisoCmp;
+
+    /// <summary>
+    /// CU-18: cancelación sin cuenta. Se usa el mismo par comprobante y documento con el que
+    /// el huésped acaba de consultar, que es la única prueba de que la reserva es suya.
+    /// </summary>
+    private async Task CancelarDesdeComprobante()
+    {
+        if (comprobante == null) return;
+        cancelandoCmp = true; errorCmp = null; avisoCmp = null;
+        try
+        {
+            var res = await Api.CancelarMiReservaAsync(comprobante.Codigo, documentoConsulta);
+            avisoCmp = res.Mensaje;
+            confirmandoCancelacion = false;
+            comprobante = await Api.ComprobantePortalAsync(numeroComprobante, documentoConsulta);
+            await Buscar();   // la habitación vuelve al catálogo
+        }
+        catch (ApiException ex) { errorCmp = ex.Message; confirmandoCancelacion = false; }
+        finally { cancelandoCmp = false; }
+    }
+
+    private ElementReference campoCmp;
+    private ElementReference campoDoc;
+    private bool faltaCmp;
+    private bool faltaDoc;
+
+    /// <summary>
+    /// Consulta el comprobante. Antes de llamar a la API comprueba que los dos campos tengan
+    /// contenido: el texto gris que se ve en ellos es un ejemplo, no un valor escrito, y enviar
+    /// la consulta vacía hacía que el servicio respondiera con una página y no con datos.
+    /// </summary>
+    private async Task BuscarComprobante()
+    {
+        errorCmp = null; comprobante = null; avisoCmp = null; confirmandoCancelacion = false;
+        faltaCmp = string.IsNullOrWhiteSpace(numeroComprobante);
+        faltaDoc = string.IsNullOrWhiteSpace(documentoConsulta);
+
+        if (faltaCmp || faltaDoc)
+        {
+            errorCmp = faltaCmp && faltaDoc
+                ? "Escriba el número de comprobante y el documento con el que reservó. El texto gris de los campos es solo un ejemplo."
+                : faltaCmp
+                    ? "Escriba el número de comprobante que recibió al reservar."
+                    : "Escriba el documento con el que se hizo la reserva.";
+            await (faltaCmp ? campoCmp : campoDoc).FocusAsync();
+            return;
+        }
+
+        buscandoCmp = true;
+        try { comprobante = await Api.ComprobantePortalAsync(numeroComprobante, documentoConsulta); }
+        catch (ApiException ex) { errorCmp = ex.Message; }
+        finally { buscandoCmp = false; }
+    }
+}

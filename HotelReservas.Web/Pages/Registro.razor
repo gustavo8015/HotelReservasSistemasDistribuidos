@@ -1,0 +1,62 @@
+@page "/registro"
+@inject ApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Crear cuenta · Hotel Reservas</PageTitle>
+
+@* CU-16 / RF21: el usuario final crea su cuenta de CLIENTE. Queda unida a su ficha de huésped por el
+   número de documento, de modo que "Mis reservas" solo muestra lo suyo. *@
+
+<div class="login">
+    <div class="tarjeta caja">
+        <div><span class="chip verde">USUARIO FINAL</span></div>
+        <h1>Crear mi cuenta</h1>
+        <p class="secundario">Con una cuenta puede ver sus reservas, volver a enviar el comprobante y reservar más rápido. Reservar no exige cuenta: también puede hacerlo escribiendo solo su documento y su nombre.</p>
+
+        <div class="fila">
+            <div class="campo" style="flex:0 0 110px"><label for="td">Documento</label>
+                <select id="td" @bind="tipoDocumento">
+                    <option value="CC">CC</option><option value="CE">CE</option>
+                    <option value="TI">TI</option><option value="PAS">Pasaporte</option>
+                </select>
+            </div>
+            <div class="campo"><label for="nd">Número</label><input id="nd" @bind="documento" /></div>
+        </div>
+        <div class="fila">
+            <div class="campo"><label for="no">Nombres</label><input id="no" @bind="nombres" /></div>
+            <div class="campo"><label for="ap">Apellidos</label><input id="ap" @bind="apellidos" /></div>
+        </div>
+        <div class="campo"><label for="te">Teléfono (WhatsApp)</label><input id="te" @bind="telefono" placeholder="3001112233" /></div>
+        <div class="campo"><label for="co">Correo</label><input id="co" type="email" @bind="correo" autocomplete="username" /></div>
+        <div class="campo"><label for="cl">Contraseña</label><input id="cl" type="password" @bind="clave" autocomplete="new-password" /></div>
+        <p class="secundario" style="margin:0">Mínimo ocho caracteres. Se guarda cifrada con PBKDF2; el hotel nunca ve su contraseña.</p>
+
+        <label class="check">
+            <input type="checkbox" @bind="extranjero" />
+            <span><b>Soy extranjero no residente</b><small>El alojamiento queda exento de IVA (artículo 481 del Estatuto Tributario).</small></span>
+        </label>
+
+        @if (error != null) { <div class="nota error" role="alert">@error</div> }
+        <button class="btn primario" disabled="@cargando" @onclick="Crear">@(cargando ? "Creando…" : "Crear mi cuenta")</button>
+        <p class="secundario" style="margin:0">¿Ya tiene cuenta? <a href="login">Iniciar sesión</a></p>
+    </div>
+</div>
+
+@code {
+    private string tipoDocumento = "CC", documento = "", nombres = "", apellidos = "", telefono = "", correo = "", clave = "";
+    private bool extranjero, cargando;
+    private string? error;
+
+    private async Task Crear()
+    {
+        error = null; cargando = true;
+        try
+        {
+            await Api.RegistroAsync(new SolicitudRegistro(tipoDocumento, documento.Trim(), nombres.Trim(), apellidos.Trim(),
+                string.IsNullOrWhiteSpace(telefono) ? null : telefono.Trim(), correo.Trim(), clave, extranjero));
+            Nav.NavigateTo("mis-reservas");
+        }
+        catch (ApiException ex) { error = ex.Message; }
+        finally { cargando = false; }
+    }
+}

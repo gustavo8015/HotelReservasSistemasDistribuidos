@@ -1,0 +1,62 @@
+﻿@inherits LayoutComponentBase
+@inject Sesion Sesion
+@inject NavigationManager Nav
+@implements IDisposable
+
+@* El menú depende del perfil: el ADMINISTRADOR ve la operación completa del hotel y el usuario final
+   solo ve el portal público y sus propias reservas (dos perfiles, script 07). *@
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="app">
+    <aside class="lateral">
+        <div class="marca"><span class="logo">HR</span><span><b>Hotel Reservas</b><small>Reservas en línea</small></span></div>
+        <nav class="menu" aria-label="Secciones de Hotel Reservas">
+            @if (Sesion.EsAdministrador)
+            {
+                <NavLink href="panel">Panel</NavLink>
+                <NavLink href="reservas">Reservas</NavLink>
+                <NavLink href="habitaciones">Habitaciones</NavLink>
+                <NavLink href="huespedes">Huéspedes</NavLink>
+                <NavLink href="reportes">Reportes</NavLink>
+                <NavLink href="asistente">Asistente</NavLink>
+                <NavLink href="administracion">Administración</NavLink>
+                <NavLink href="usuarios">Usuarios</NavLink>
+                <NavLink href="" Match="NavLinkMatch.All">Ver el portal</NavLink>
+            }
+            else
+            {
+                <NavLink href="" Match="NavLinkMatch.All">Habitaciones</NavLink>
+                <NavLink href="mis-reservas">Mis reservas</NavLink>
+                @* El asistente también está para el huésped, con su propio catálogo de consultas. *@
+                <NavLink href="asistente">Asistente</NavLink>
+                @if (!Sesion.Activa)
+                {
+                    <NavLink href="registro">Crear cuenta</NavLink>
+                }
+            }
+        </nav>
+        <div class="pie">
+            @if (Sesion.Activa)
+            {
+                <b>@Sesion.Nombre</b><br /><span>@(Sesion.EsAdministrador ? "ADMINISTRADOR" : "USUARIO FINAL")</span><br />
+                <button class="btn chico claro" @onclick="Salir">Cerrar sesión</button>
+            }
+            else
+            {
+                <span>Reserve sin cuenta o inicie sesión para ver su historial.</span><br />
+                <button class="btn chico claro" @onclick='() => Nav.NavigateTo("login")'>Iniciar sesión</button>
+            }
+        </div>
+    </aside>
+    <main class="principal" id="contenido" tabindex="-1">
+        @Body
+    </main>
+</div>
+
+@* Asistente flotante: acompaña todas las pantallas, con el catálogo del perfil de quien mira. *@
+<AsistenteWidget />
+
+@code {
+    protected override void OnInitialized() => Sesion.Cambio += StateHasChanged;
+    public void Dispose() => Sesion.Cambio -= StateHasChanged;
+    private void Salir() { Sesion.Cerrar(); Nav.NavigateTo(""); }
+}

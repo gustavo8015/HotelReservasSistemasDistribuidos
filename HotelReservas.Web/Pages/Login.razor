@@ -1,0 +1,33 @@
+@page "/login"
+@inject ApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Iniciar sesión · Hotel Reservas</PageTitle>
+
+@* CU-01 / RF01: inicio de sesión contra POST /api/auth/login; el token JWT queda en la sesión. *@
+<div class="login">
+    <div class="tarjeta caja">
+        <div><span class="chip azul">Hotel Reservas</span></div>
+        <h1>Iniciar sesión</h1>
+        <div class="campo"><label for="correo">Correo</label><input id="correo" @bind="correo" autocomplete="username" /></div>
+        <div class="campo"><label for="clave">Contraseña</label><input id="clave" type="password" @bind="clave" autocomplete="current-password" @onkeydown="Enter" /></div>
+        @if (error != null) { <div class="nota error" role="alert">@error</div> }
+        <button class="btn primario" disabled="@cargando" @onclick="Entrar">@(cargando ? "Conectando…" : "Entrar")</button>
+        <p class="secundario">¿No tiene cuenta? <a href="registro">Créela aquí</a>, o reserve sin cuenta desde <a href="">el catálogo de habitaciones</a>.</p>
+    </div>
+</div>
+
+@code {
+    private string correo = "", clave = "";
+    private string? error; private bool cargando;
+
+    private Task Enter(KeyboardEventArgs e) => e.Key == "Enter" ? Entrar() : Task.CompletedTask;
+
+    private async Task Entrar()
+    {
+        error = null; cargando = true;
+        try { var r = await Api.LoginAsync(correo.Trim(), clave); Nav.NavigateTo(r.Rol == "ADMINISTRADOR" ? "panel" : "mis-reservas"); }
+        catch (ApiException ex) { error = ex.Estado == System.Net.HttpStatusCode.Unauthorized ? "Correo o contraseña incorrectos." : ex.Message; }
+        finally { cargando = false; }
+    }
+}
