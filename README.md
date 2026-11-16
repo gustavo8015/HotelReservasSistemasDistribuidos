@@ -1,5 +1,11 @@
 # Hotel Reservas · versión web
 
+## Equipo
+
+| Integrante | GitHub | Responsabilidad en el proyecto |
+|---|---|---|
+| Gustavo Adolfo Cardona Bayona | [gustavo8015](https://github.com/gustavo8015) | Arquitectura, API REST, base de datos SQL Server y servicios de IA |
+
 Sistema de reservas hoteleras en línea, desarrollado para la asignatura Sistemas
 Distribuidos de la Universidad Manuela Beltrán. Consta de una interfaz de usuario
 en Blazor WebAssembly, un servicio REST en ASP.NET Core 8 y una base de datos en
