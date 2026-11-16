@@ -1,0 +1,104 @@
+# Despliegue del sistema en tres nodos lógicos: la base de datos, el servicio de aplicación y la
+# pasarela que sirve el cliente web. Cada uno corre en su propio contenedor, con su propia red y
+# su propio control de salud, de modo que el conjunto se levanta con una sola orden:
+#
+#     docker compose up -d --build
+#
+# La base de datos conserva sus archivos en un volumen con nombre, así que detener y volver a
+# levantar los contenedores no borra las reservas.
+
+services:
+
+  # --------------------------------------------------------------------------
+  # Nodo de datos
+  # --------------------------------------------------------------------------
+  base-de-datos:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: hotel-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SQL_PASSWORD:?defina SQL_PASSWORD en el archivo .env}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - datos-sqlserver:/var/opt/mssql
+    networks: [hotel]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # --------------------------------------------------------------------------
+  # Carga del esquema: ejecuta una sola vez los guiones de database/ en orden
+  # numérico y termina. Espera a que la base esté sana antes de empezar.
+  # --------------------------------------------------------------------------
+  esquema:
+    image: mcr.microsoft.com/mssql-tools:latest
+    container_name: hotel-esquema
+    depends_on:
+      base-de-datos:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: ${SQL_PASSWORD}
+    volumes:
+      - ./database:/guiones:ro
+    networks: [hotel]
+    entrypoint: >
+      /bin/bash -c "
+      for guion in $$(ls /guiones/*.sql | sort -V); do
+        case \"$$guion\" in *12b_*) echo \"Omitido $$guion (restauración opcional)\"; continue;; esac;
+        echo \"Ejecutando $$guion\";
+        /opt/mssql-tools/bin/sqlcmd -S base-de-datos -U sa -P \"$$MSSQL_SA_PASSWORD\" -b -i \"$$guion\" || exit 1;
+      done;
+      echo 'Esquema cargado.'"
+    restart: "no"
+
+  # --------------------------------------------------------------------------
+  # Nodo de aplicación: la API REST
+  # --------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: HotelReservas.Api/Dockerfile
+    container_name: hotel-api
+    depends_on:
+      esquema:
+        condition: service_completed_successfully
+    environment:
+      ConnectionStrings__HotelReservas: "Server=base-de-datos,1433;Database=HotelReservas;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=True;Encrypt=True;"
+      Jwt__Key: ${JWT_KEY:?defina JWT_KEY en el archivo .env, mínimo 32 caracteres}
+      Jwt__Issuer: HotelReservas.Api
+      Jwt__Audience: HotelReservas.App
+      Asistente__BaseUrl: ${ASISTENTE_BASEURL:-}
+      Asistente__ApiKey: ${ASISTENTE_APIKEY:-}
+      Asistente__Modelo: ${ASISTENTE_MODELO:-}
+      ASPNETCORE_ENVIRONMENT: Production
+    ports:
+      - "8080:8080"
+    networks: [hotel]
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Nodo de presentación: pasarela nginx con el cliente Blazor WebAssembly
+  # --------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: HotelReservas.Web/Dockerfile
+    container_name: hotel-web
+    depends_on:
+      - api
+    ports:
+      - "8090:80"
+    networks: [hotel]
+    restart: unless-stopped
+
+networks:
+  hotel:
+    driver: bridge
+
+volumes:
+  datos-sqlserver:

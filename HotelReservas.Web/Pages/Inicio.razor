@@ -1,0 +1,68 @@
+@page "/panel"
+@inject ApiClient Api
+@inject Sesion Sesion
+@inject NavigationManager Nav
+
+<PageTitle>Inicio · Hotel Reservas</PageTitle>
+
+@* Equivale a Views/InicioPage.xaml de la app MAUI: encabezado, propósito, estado de hoy, módulos y arquitectura. *@
+<div class="hero">
+    <div class="k">SISTEMA DISTRIBUIDO</div>
+    <h1>Hotel Reservas</h1>
+    <p>Gestión de reservas de habitaciones con integridad, consistencia y seguridad de la información.</p>
+    <div class="chips"><span class="chip verde">Panel de administración</span></div>
+</div>
+
+<h3>Propósito del sistema</h3>
+<div class="tarjeta">
+    <p style="margin:0 0 8px">Permitir al personal del hotel registrar huéspedes y habitaciones, consultar disponibilidad en tiempo real, realizar reservas y generar comprobantes, garantizando que cada reserva se confirme como una transacción completa: si algo falla, no queda ningún cambio a medias.</p>
+    <p class="secundario" style="margin:0">Transacción crítica: confirmar reserva (verificar disponibilidad, bloquear habitación, registrar huésped y pago, emitir comprobante).</p>
+</div>
+
+<h3>Estado de hoy</h3>
+@if (!Sesion.Activa)
+{
+    <div class="nota info">Inicie sesión para ver el estado real desde la API. <a href="login">Iniciar sesión</a></div>
+}
+else if (error != null)
+{
+    <div class="nota error">@error</div>
+}
+else
+{
+    <div class="grid g3">
+        <div class="tarjeta kpi"><b>@enCasa</b><span>En casa</span></div>
+        <div class="tarjeta kpi verde"><b>@confirmadas</b><span>Reservas confirmadas</span></div>
+        <div class="tarjeta kpi naranja"><b>@llegadasHoy</b><span>Llegadas hoy</span></div>
+    </div>
+}
+
+<h3>Módulos del sistema</h3>
+<div class="grid g2">
+    <div class="tarjeta modulo" @onclick='() => Nav.NavigateTo("reservas")'><b>Reservas</b><span>Crear, modificar y cancelar reservas. Comprobantes.</span></div>
+    <div class="tarjeta modulo" @onclick='() => Nav.NavigateTo("habitaciones")'><b>Habitaciones</b><span>Tipos, tarifas y disponibilidad por fechas.</span></div>
+    <div class="tarjeta modulo" @onclick='() => Nav.NavigateTo("huespedes")'><b>Huéspedes</b><span>Registro y consulta de huéspedes.</span></div>
+    <div class="tarjeta modulo" @onclick='() => Nav.NavigateTo("reportes")'><b>Reportes</b><span>Historial de reservas y ocupación.</span></div>
+</div>
+<div class="fila">
+    <button class="btn primario" @onclick='() => Nav.NavigateTo("reservas")'>Nueva reserva</button>
+    <button class="btn" @onclick='() => Nav.NavigateTo("reservas")'>Consultar disponibilidad</button>
+</div>
+
+@code {
+    private int enCasa, confirmadas, llegadasHoy; private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Sesion.Activa) return;
+        try
+        {
+            var lista = await Api.ReservasAsync();
+            var hoy = DateOnly.FromDateTime(DateTime.Now);
+            enCasa = lista.Count(r => r.Estado == "EN_CASA");
+            confirmadas = lista.Count(r => r.Estado == "CONFIRMADA");
+            llegadasHoy = lista.Count(r => r.Estado == "CONFIRMADA" && r.FechaEntrada == hoy);
+        }
+        catch (ApiException ex) { error = ex.Message; }
+    }
+}

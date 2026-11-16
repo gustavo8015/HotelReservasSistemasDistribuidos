@@ -1,0 +1,96 @@
+### CU-11 / RF11 · Pruebas del módulo de administración (solo ADMINISTRADOR)
+@host = http://localhost:5080
+
+### 1. Iniciar sesión como administrador
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "correo": "admin@hotel.com", "clave": "Hotel2026*" }
+
+### Token de la respuesta anterior
+@token = {{login.response.body.token}}
+
+### 2. Tipos con su tarifa vigente
+GET {{host}}/api/admin/tipos
+Authorization: Bearer {{token}}
+
+### 3. Histórico de precios
+GET {{host}}/api/admin/tarifas
+Authorization: Bearer {{token}}
+
+### 4. Registrar un precio nuevo (cierra la tarifa anterior el día previo)
+POST {{host}}/api/admin/tarifas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "idTipo": 2, "valorNoche": 345000, "vigenciaDesde": "2026-12-01" }
+
+### 5. Inventario de habitaciones
+GET {{host}}/api/admin/habitaciones
+Authorization: Bearer {{token}}
+
+### 6. Crear una habitación
+POST {{host}}/api/admin/habitaciones
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "numero": "402", "piso": 4, "idTipo": 2, "estado": "DISPONIBLE" }
+
+### 7. Modificar una habitación
+PUT {{host}}/api/admin/habitaciones/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "numero": "101", "piso": 1, "idTipo": 1, "estado": "DISPONIBLE" }
+
+### 8. Eliminar una habitación (sin reservas se borra; con historial pasa a MANTENIMIENTO)
+DELETE {{host}}/api/admin/habitaciones/9
+Authorization: Bearer {{token}}
+
+### 9. Buscar huéspedes
+GET {{host}}/api/admin/huespedes?buscar=20
+Authorization: Bearer {{token}}
+
+### 10. Corregir los datos de un huésped
+PUT {{host}}/api/admin/huespedes/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "tipoDocumento": "CC", "numeroDocumento": "2020202020", "nombres": "María Camila", "apellidos": "Márquez",
+  "telefono": "3001234567", "correo": "maria@correo.com", "extranjeroNoResidente": false }
+
+### 11. Eliminar un huésped (con reservas responde 409 con la explicación)
+DELETE {{host}}/api/admin/huespedes/1
+Authorization: Bearer {{token}}
+
+### 12. Modificar una reserva: una noche más
+PUT {{host}}/api/admin/reservas/RSV-0001
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "fechaEntrada": "2026-11-20", "fechaSalida": "2026-11-24", "numeroPersonas": 2,
+  "idHabitacion": 2, "versionFila": null, "motivo": "El huésped solicitó una noche más" }
+
+### 13. Eliminar definitivamente una reserva ya cancelada o finalizada
+DELETE {{host}}/api/admin/reservas/RSV-0001
+Authorization: Bearer {{token}}
+
+### 14. Control de rol: iniciar sesión como recepcionista
+# @name loginRec
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "correo": "recepcion1@hotel.com", "clave": "Hotel2026*" }
+
+### 15. El recepcionista recibe 403 en cualquier recurso de administración
+GET {{host}}/api/admin/tipos
+Authorization: Bearer {{loginRec.response.body.token}}
+
+### 16. Eliminar una tarifa (cualquier vigencia: la anterior absorbe el periodo liberado)
+DELETE {{host}}/api/admin/tarifas/4
+Authorization: Bearer {{token}}
+
+### 17. Eliminar la única tarifa de un tipo con habitaciones: responde 409 con la explicación
+DELETE {{host}}/api/admin/tarifas/1
+Authorization: Bearer {{token}}

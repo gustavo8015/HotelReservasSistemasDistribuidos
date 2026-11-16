@@ -1,0 +1,87 @@
+@inject InterruptorCircuito Circuito
+@inject HttpClient Http
+@implements IDisposable
+
+@* Degradación visible: cuando el interruptor de circuito está abierto, la aplicación lo dice en
+   lugar de dejar que cada pantalla falle por su cuenta con un mensaje distinto. El catálogo ya
+   cargado se sigue viendo; lo que se anuncia es que las operaciones contra la API van a fallar
+   hasta que el servicio vuelva. *@
+
+@if (Circuito.Estado != EstadoCircuito.Cerrado)
+{
+    <div class="aviso-servicio" role="status" aria-live="polite">
+        <span class="aviso-punto" aria-hidden="true"></span>
+        <div>
+            <b>Servicio no disponible</b>
+            <span>
+                @if (Circuito.Estado == EstadoCircuito.Abierto)
+                {
+                    <text>La API no está respondiendo. Se vuelve a intentar en @segundos s.</text>
+                }
+                else
+                {
+                    <text>Probando la conexión con la API.</text>
+                }
+            </span>
+        </div>
+        <button class="btn chico claro" @onclick="Probar" disabled="@probando">
+            @(probando ? "Probando…" : "Reintentar ahora")
+        </button>
+    </div>
+}
+
+@code {
+    private int segundos;
+    private bool probando;
+    private CancellationTokenSource? reloj;
+
+    protected override void OnInitialized()
+    {
+        Circuito.Cambio += AlCambiar;
+        segundos = Circuito.SegundosRestantes;
+    }
+
+    private void AlCambiar()
+    {
+        segundos = Circuito.SegundosRestantes;
+        InvokeAsync(StateHasChanged);
+        if (Circuito.Estado == EstadoCircuito.Abierto) IniciarCuenta();
+    }
+
+    /// <summary>Cuenta regresiva de un segundo mientras el circuito esté abierto.</summary>
+    private void IniciarCuenta()
+    {
+        reloj?.Cancel();
+        reloj = new CancellationTokenSource();
+        var token = reloj.Token;
+        _ = Task.Run(async () =>
+        {
+            while (!token.IsCancellationRequested && Circuito.Estado == EstadoCircuito.Abierto)
+            {
+                await Task.Delay(1000, token);
+                segundos = Circuito.SegundosRestantes;
+                await InvokeAsync(StateHasChanged);
+            }
+            await InvokeAsync(StateHasChanged);
+        }, token);
+    }
+
+    /// <summary>
+    /// Prueba manual contra el recurso de salud de la API. Si responde, el manejador registra el
+    /// éxito y el interruptor se cierra sin esperar a que venza el periodo de reposo.
+    /// </summary>
+    private async Task Probar()
+    {
+        probando = true;
+        try { using var r = await Http.GetAsync("health"); }
+        catch { }
+        finally { probando = false; segundos = Circuito.SegundosRestantes; }
+    }
+
+    public void Dispose()
+    {
+        Circuito.Cambio -= AlCambiar;
+        reloj?.Cancel();
+        reloj?.Dispose();
+    }
+}

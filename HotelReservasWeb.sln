@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HotelReservas.Api", "HotelReservas.Api\HotelReservas.Api.csproj", "{5DB8D68C-5A46-42BC-9CA4-C758BD975896}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HotelReservas.Web", "HotelReservas.Web\HotelReservas.Web.csproj", "{3EC48E0D-6B8A-401E-972A-9E9F575123E5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pruebas", "pruebas\Pruebas.csproj", "{2C017F79-51B3-4C0F-B2B9-C60436BE3E62}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5DB8D68C-5A46-42BC-9CA4-C758BD975896}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5DB8D68C-5A46-42BC-9CA4-C758BD975896}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5DB8D68C-5A46-42BC-9CA4-C758BD975896}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5DB8D68C-5A46-42BC-9CA4-C758BD975896}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3EC48E0D-6B8A-401E-972A-9E9F575123E5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3EC48E0D-6B8A-401E-972A-9E9F575123E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3EC48E0D-6B8A-401E-972A-9E9F575123E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3EC48E0D-6B8A-401E-972A-9E9F575123E5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2C017F79-51B3-4C0F-B2B9-C60436BE3E62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C017F79-51B3-4C0F-B2B9-C60436BE3E62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C017F79-51B3-4C0F-B2B9-C60436BE3E62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C017F79-51B3-4C0F-B2B9-C60436BE3E62}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

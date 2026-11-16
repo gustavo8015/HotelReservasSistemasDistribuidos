@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>Hotel Reservas · Prototipo interactivo</title>
+<style>
+:root{--azul:#0B2A5B;--verde:#1F6B3D;--naranja:#E8821A;--gris:#5B6B82;--fondo:#F2F5F8;--borde:#DDE3EA}
+*{box-sizing:border-box} body{margin:0;background:#e3e8ee;font-family:"Segoe UI",Roboto,Arial,sans-serif;color:#1C2B4A;display:flex;gap:28px;justify-content:center;align-items:flex-start;padding:24px;min-height:100vh}
+.phone{width:400px;height:860px;background:#000;border-radius:44px;padding:12px;box-shadow:0 20px 50px rgba(0,0,0,.35);flex:none}
+.screen{width:100%;height:100%;background:var(--fondo);border-radius:34px;overflow:hidden;display:flex;flex-direction:column}
+.status{height:32px;background:var(--azul);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex:none}
+.appbar{background:var(--azul);color:#fff;padding:8px 18px 14px;font-size:17px;font-weight:600;display:flex;align-items:center;gap:10px;flex:none}
+.appbar small{font-weight:400;font-size:12px;color:#D6E0EE;display:block}
+.appbar .back{cursor:pointer;font-size:22px;line-height:1}
+.content{flex:1;overflow-y:auto;padding:12px 16px}
+.view{display:none}.view.on{display:block}
+h3{color:var(--verde);font-size:14px;margin:10px 0 6px}
+.card{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:12px;font-size:13px;line-height:1.35;margin-bottom:10px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.lbl{font-size:11px;color:var(--gris);letter-spacing:.5px;text-transform:uppercase}
+select,input{width:100%;border:none;background:transparent;font-size:14px;font-weight:600;color:#1C2B4A;margin-top:2px;font-family:inherit;outline:none}
+.btn{height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;margin-top:8px;cursor:pointer;user-select:none;border:none;width:100%;font-family:inherit}
+.p{background:var(--verde);color:#fff}.s{background:#fff;border:1.5px solid var(--azul);color:var(--azul)}.d{background:#eee;color:#999}.w{background:var(--naranja);color:#fff}
+.hab{display:flex;justify-content:space-between;align-items:center;cursor:pointer}.hab.sel{outline:2px solid var(--verde)}
+.hab b{font-size:15px}.pr{color:var(--verde);font-weight:700}
+.tag{font-size:11px;padding:3px 8px;border-radius:10px;color:#fff;background:var(--verde);display:inline-block}.tag.o{background:var(--naranja)}.tag.g{background:var(--gris)}
+.mods{display:grid;grid-template-columns:1fr 1fr;gap:10px}.mods .card{cursor:pointer;margin:0}.mods b{display:block;margin:4px 0 2px}.mods span{color:var(--gris);font-size:12px}
+.stats{display:flex;gap:10px}.stats .card{flex:1;padding:10px;margin:0}.stats b{font-size:24px;display:block}
+.hero{background:var(--azul);color:#fff;padding:12px 18px 18px;margin:-12px -16px 10px}.hero .k{font-size:11px;letter-spacing:2px;color:#9FB3D1}.hero h1{margin:4px 0 6px;font-size:26px}.hero p{margin:0;font-size:13px;color:#D6E0EE}
+.sum td{padding:3px 0;font-size:13px}.sum td:last-child{text-align:right;font-weight:600}
+.warn{background:#FFF4E5;border:1px solid #F3C98B;border-radius:10px;padding:8px 10px;font-size:12px;color:#7A4B00;margin-top:8px}
+.ok{background:#E9F6EE;border:1px solid #A8D8B9;border-radius:10px;padding:8px 10px;font-size:12px;color:var(--verde);margin-top:8px}
+.err{background:#FDECEC;border:1px solid #F3B2B2;border-radius:10px;padding:8px 10px;font-size:12px;color:#8A1C1C;margin-top:8px}
+.msg{max-width:88%;padding:10px 12px;border-radius:14px;font-size:13px;line-height:1.35;margin-bottom:8px}.me{background:var(--azul);color:#fff;margin-left:auto;border-bottom-right-radius:4px}.ia{background:#fff;border:1px solid var(--borde);border-bottom-left-radius:4px}.ia small{display:block;color:var(--gris);font-size:11px;margin-top:6px}
+.input{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid var(--borde);border-radius:24px;padding:6px 6px 6px 12px;margin-top:8px}.input input{font-weight:400;margin:0}.input button{border:none;background:var(--verde);color:#fff;border-radius:18px;padding:8px 14px;font-weight:700;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chip{font-size:11.5px;border:1px solid var(--azul);color:var(--azul);border-radius:12px;padding:4px 9px;cursor:pointer;background:#fff}
+.tabs{height:62px;background:#fff;border-top:1px solid var(--borde);display:flex;justify-content:space-around;align-items:center;font-size:10.5px;color:var(--gris);flex:none}
+.tabs div{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}.tabs .on{color:var(--azul);font-weight:700}.tabs i{width:22px;height:22px;border:2px solid currentColor;border-radius:6px;display:block}
+.log{font-family:Consolas,monospace;font-size:11.5px;background:#1C2B4A;color:#E8F0FF;border-radius:10px;padding:10px;white-space:pre-wrap;line-height:1.4;max-height:300px;overflow:auto}
+.lst td{font-size:12px;padding:4px 2px;border-bottom:1px solid #eee;vertical-align:top}
+/* panel del servidor */
+.server{width:560px;background:#fff;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:18px 20px;flex:none}
+.server h2{margin:0 0 4px;font-size:18px;color:var(--azul)}.server .sub{font-size:12px;color:var(--gris);margin-bottom:10px}
+.server h4{margin:12px 0 6px;font-size:13px;color:var(--verde);letter-spacing:.5px;text-transform:uppercase}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}.tbl th{background:var(--fondo);text-align:left;padding:5px 6px;border-bottom:1px solid var(--borde)}.tbl td{padding:5px 6px;border-bottom:1px solid #eee}
+.conc{display:flex;gap:10px;align-items:center;background:#FFF4E5;border:1px solid #F3C98B;border-radius:10px;padding:10px;font-size:12.5px}
+.conc button{border:none;background:var(--naranja);color:#fff;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;flex:none}
+.kpi{display:flex;gap:8px}.kpi div{flex:1;background:var(--fondo);border-radius:10px;padding:8px;text-align:center}.kpi b{display:block;font-size:20px;color:var(--azul)}.kpi span{font-size:11px;color:var(--gris)}
+
+/* ---- modo APK (dentro del WebView de la app .NET MAUI) ---- */
+body.apk{padding:0;background:#fff;display:block;min-height:100vh}
+body.apk .phone{width:100vw;height:100vh;height:100dvh;background:transparent;border-radius:0;padding:0;box-shadow:none}
+body.apk .screen{border-radius:0}
+body.apk .status{display:none}
+body.apk .tabs{display:none}
+body.apk .server{display:none;position:fixed;inset:0;width:100vw;max-width:none;border-radius:0;overflow:auto;z-index:50;box-shadow:none}
+body.apk .server.on{display:block}
+body.apk .fab{display:flex}
+.fab{display:none;position:fixed;right:14px;bottom:76px;z-index:60;background:#0B2A5B;color:#fff;border:none;border-radius:22px;padding:10px 14px;font-weight:700;font-size:12px;box-shadow:0 6px 16px rgba(0,0,0,.3);cursor:pointer;font-family:inherit}
+.fab.close{bottom:18px;background:#a51c22}
+</style></head><body>
+
+<div class="phone"><div class="screen">
+<div class="status"><span id="clock">9:41</span><span>▲ ▮ ■</span></div>
+<div class="appbar"><span class="back" onclick="go('inicio')">‹</span><div><span id="title">Inicio</span><small id="subtitle">Hotel Reservas · prototipo</small></div></div>
+<div class="content">
+
+<!-- INICIO -->
+<div class="view on" id="v-inicio">
+<div class="hero"><div class="k">SISTEMA TRANSACCIONAL</div><h1>Hotel Reservas</h1><p>Gestión de reservas con integridad, consistencia y seguridad de la información.</p></div>
+<h3>Estado de hoy</h3>
+<div class="stats"><div class="card"><b style="color:var(--azul)" id="kOcu">0</b><span class="lbl">Ocupadas</span></div><div class="card"><b style="color:var(--verde)" id="kDis">0</b><span class="lbl">Disponibles</span></div><div class="card"><b style="color:var(--naranja)" id="kRes">0</b><span class="lbl">Reservadas</span></div></div>
+<h3>Módulos del sistema</h3>
+<div class="mods">
+<div class="card" onclick="go('disp')"><b>Reservas</b><span>Consultar disponibilidad y crear reservas.</span></div>
+<div class="card" onclick="go('habs')"><b>Habitaciones</b><span>Inventario, tipos y estados.</span></div>
+<div class="card" onclick="go('hist')"><b>Historial</b><span>Reservas, comprobantes y bitácora.</span></div>
+<div class="card" onclick="go('ia')"><b>Asistente</b><span>Consultas en lenguaje natural.</span></div>
+</div>
+<button class="btn p" onclick="go('disp')">Nueva reserva</button>
+<h3>Reserva rápida · huésped frecuente</h3>
+<div class="card" style="margin:0"><span class="lbl">Documento del huésped</span>
+<div class="input" style="margin-top:4px"><input id="qDoc" placeholder="Ej. 2020202020" onkeydown="if(event.key==='Enter')frecuente()"><button onclick="frecuente()">Buscar</button></div>
+<div id="freqRes"><span class="lbl" style="text-transform:none;letter-spacing:0">Con solo el número de documento la app reconoce al huésped frecuente, carga sus datos y le propone repetir su última estadía en un toque.</span></div></div>
+<div class="card" style="margin-top:10px"><span class="lbl">Sesión</span><br><b>Recepcionista turno 1</b> · token JWT válido · perfil RECEPCIONISTA</div>
+</div>
+
+<!-- DISPONIBILIDAD -->
+<div class="view" id="v-disp">
+<div class="row"><div class="card"><span class="lbl">Tipo</span><select id="fTipo"><option>Doble</option><option>Sencilla</option><option>Suite</option></select></div><div class="card"><span class="lbl">Personas</span><select id="fPers"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div></div>
+<div class="row"><div class="card"><span class="lbl">Entrada</span><input type="date" id="fIn" value="2026-10-16"></div><div class="card"><span class="lbl">Salida</span><input type="date" id="fOut" value="2026-10-18"></div></div>
+<button class="btn s" onclick="buscar()">Buscar habitaciones</button>
+<div id="resultados"></div>
+</div>
+
+<!-- CONFIRMAR -->
+<div class="view" id="v-conf">
+<div class="card"><span class="lbl">Huésped</span><select id="fHuesped"></select><span class="lbl" id="huDoc"></span><div id="freqTag"></div></div>
+<div class="card" style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="fExento" style="width:20px;height:20px;margin:0" onchange="recalc()"><label for="fExento" style="font-size:12.5px;line-height:1.3"><b>Huésped extranjero no residente</b><br><span class="lbl" style="text-transform:none;letter-spacing:0">Alojamiento exento de IVA (art. 481 E.T.) · requiere pasaporte y tarjeta migratoria</span></label></div>
+<div class="card"><table class="sum" style="width:100%" id="resumen"></table></div>
+<div class="row"><div class="card"><span class="lbl">Medio de pago</span><select id="fMedio"><option>TARJETA</option><option>EFECTIVO</option><option>TRANSFERENCIA</option></select></div><div class="card"><span class="lbl">Precio neto a pagar</span><input id="fPago" readonly></div></div>
+<div class="warn">Al confirmar, el servidor vuelve a verificar la disponibilidad con bloqueo y registra en una sola transacción la reserva, el pago, el comprobante y la bitácora. Si otra persona tomó la habitación, no se guarda nada.</div>
+<button class="btn p" onclick="confirmar()">Confirmar reserva</button>
+<button class="btn d" onclick="go('disp')">Cancelar</button>
+<div id="confRes"></div>
+</div>
+
+<!-- HABITACIONES -->
+<div class="view" id="v-habs"><div id="habsList"></div></div>
+
+<!-- HISTORIAL -->
+<div class="view" id="v-hist"><h3>Reservas</h3><div id="histList"></div><h3>Bitácora</h3><div class="card" id="bitList" style="font-size:12px"></div></div>
+
+<!-- ASISTENTE -->
+<div class="view" id="v-ia">
+<div id="chat"><div class="msg ia">Hola. Puedo consultar disponibilidad, tarifas, reservas y llegadas. No creo ni modifico reservas.<small>Funciones de solo lectura · Azure OpenAI (simulado en el prototipo)</small></div></div>
+<div class="chips"><span class="chip" onclick="ask('¿Qué habitaciones dobles hay libres del 16 al 18 de octubre?')">Dobles libres 16-18 oct</span><span class="chip" onclick="ask('¿Cuánto cuesta una suite por 3 noches con IVA?')">Precio neto suite 3 noches</span><span class="chip" onclick="ask('¿Cuántas reservas hay confirmadas?')">Reservas confirmadas</span><span class="chip" onclick="ask('Reserva la 103 para Laura Martínez')">Reserva la 103</span></div>
+<div class="input"><input id="q" placeholder="Escribe tu consulta…" onkeydown="if(event.key==='Enter')ask()"><button onclick="ask()">Enviar</button></div>
+</div>
+
+</div>
+<div class="tabs">
+<div id="t-inicio" class="on" onclick="go('inicio')"><i></i>Inicio</div><div id="t-disp" onclick="go('disp')"><i></i>Reservas</div><div id="t-habs" onclick="go('habs')"><i></i>Habitaciones</div><div id="t-hist" onclick="go('hist')"><i></i>Historial</div><div id="t-ia" onclick="go('ia')"><i></i>Asistente</div>
+</div>
+</div></div>
+
+<button class="fab" id="fabSrv" onclick="toggleSrv()">Ver servidor</button>
+<div class="server" id="srv">
+<h2>Servidor · API REST + SQL Server (simulación)</h2><button class="fab close" onclick="toggleSrv()">Cerrar</button>
+<div class="sub">Lo que ocurre en la capa de lógica de negocio y en la base de datos mientras se usa la app. Datos del script 03_datos_de_prueba.sql.</div>
+<div class="kpi"><div><b id="sRes">0</b><span>reservas</span></div><div><b id="sPag">0</b><span>pagos</span></div><div><b id="sCmp">0</b><span>comprobantes</span></div><div><b id="sBit">0</b><span>bitácora</span></div><div><b id="s409">0</b><span>conflictos 409</span></div></div>
+<h4>Prueba de concurrencia</h4>
+<div class="conc"><span>Simula que otro recepcionista confirma la <b>misma habitación y fechas</b> un instante antes de que esta app pulse Confirmar. La segunda transacción debe fallar con <b>50001 → HTTP 409</b> y no dejar datos parciales.</span><button onclick="toggleConc()" id="bConc">Activar</button></div>
+<h4>Registro de la API y del motor</h4>
+<div class="log" id="log">Esperando solicitudes…</div>
+<h4>Tabla RESERVA</h4>
+<table class="tbl"><thead><tr><th>id</th><th>codigo</th><th>hab</th><th>huésped</th><th>entrada</th><th>salida</th><th>subtotal</th><th>impuesto</th><th>valor_total</th><th>estado</th><th>version_fila</th></tr></thead><tbody id="tReserva"></tbody></table>
+</div>
+
+<script>
+// ---------- Datos (coherentes con los scripts del repositorio) ----------
+const tipos={1:{nombre:'Sencilla',cap:1,tarifa:120000},2:{nombre:'Doble',cap:2,tarifa:180000},3:{nombre:'Suite',cap:4,tarifa:350000}};
+const habs=[];const plan=[[1,1],[1,1],[1,2],[1,2],[1,3],[2,1],[2,1],[2,2],[2,2],[2,3],[3,1],[3,1],[3,2],[3,2],[3,3],[4,1],[4,1],[4,2],[4,2],[4,3],[5,1],[5,1],[5,2],[5,2],[5,3]];
+plan.forEach(([piso,tipo],i)=>{const n=piso*100+(i%5)+1;habs.push({id:i+1,numero:String(n),piso,tipo,estado:n===302?'MANTENIMIENTO':'DISPONIBLE'})});
+// Huéspedes: tel para el comprobante por WhatsApp; estadias/ultima para la reserva rápida (huésped frecuente = 2 o más estadías)
+const huespedes=[{id:1,nombre:'Laura Martínez Pérez',doc:'CC 1010101010',tel:'573001234567',estadias:1},
+ {id:2,nombre:'Carlos Gómez Rojas',doc:'CC 2020202020',tel:'573109876543',estadias:4,ultima:{tipo:2,pers:2,medio:'TARJETA',hab:'204',noches:1,fecha:'2026-09-26'}},
+ {id:3,nombre:'Ana Silva Duarte',doc:'CE 3030303030',tel:'573157654321',estadias:2,ultima:{tipo:3,pers:2,medio:'TRANSFERENCIA',hab:'105',noches:4,fecha:'2026-10-15'}},
+ {id:4,nombre:'John Walker Smith',doc:'PA AB123456',tel:'13055550147',estadias:0,extranjero:true}];
+// Impuestos: IVA 19 % sobre el alojamiento; exento para extranjeros no residentes (art. 481 E.T.)
+const IVA=0.19;function calc(sub,exento){const iva=exento?0:Math.round(sub*IVA);return{sub,iva,neto:sub+iva,exento:!!exento}}
+let reservas=[],pagos=[],comprobantes=[],bitacora=[],seq=44,conflictos=0,conc=false,sel=null,version=1,pref=null;
+// reservas de ejemplo
+function seed(){ let t=calc(180000,false);reservas.push({id:1,codigo:'RSV000000043',hab:habByNum('204'),huesped:2,entrada:'2026-10-17',salida:'2026-10-18',pers:2,sub:t.sub,iva:t.iva,valor:t.neto,exento:false,medio:'TARJETA',cmp:'CMP000000001',estado:'CONFIRMADA',ver:version++});
+ t=calc(1400000,false);reservas.push({id:2,codigo:'RSV000000044',hab:habByNum('105'),huesped:3,entrada:'2026-10-15',salida:'2026-10-19',pers:2,sub:t.sub,iva:t.iva,valor:t.neto,exento:false,medio:'TRANSFERENCIA',cmp:'CMP000000002',estado:'EN_CASA',ver:version++}); habByNum('105').estado='OCUPADA';
+ pagos.push({res:1,valor:reservas[0].valor,medio:'TARJETA'},{res:2,valor:reservas[1].valor,medio:'TRANSFERENCIA'}); comprobantes.push({res:1,num:'CMP000000001'},{res:2,num:'CMP000000002'});
+ bitacora.push({res:'RSV000000043',usuario:'recepcion2',de:'-',a:'CONFIRMADA',fecha:'15/10 08:12'},{res:'RSV000000044',usuario:'recepcion1',de:'-',a:'CONFIRMADA',fecha:'14/10 17:40'},{res:'RSV000000044',usuario:'recepcion1',de:'CONFIRMADA',a:'EN_CASA',fecha:'15/10 14:05'});}
+function habByNum(n){return habs.find(h=>h.numero===n)}
+const fmt=v=>'$ '+v.toLocaleString('es-CO');
+const noches=(a,b)=>Math.round((new Date(b)-new Date(a))/86400000);
+function solapa(h,ent,sal){return reservas.some(r=>r.hab.id===h.id&&['CONFIRMADA','EN_CASA'].includes(r.estado)&&r.entrada<sal&&r.salida>ent)}
+function log(t,cls){const el=document.getElementById('log');if(el.textContent.startsWith('Esperando'))el.textContent='';el.textContent+=t+'\n';el.scrollTop=el.scrollHeight}
+// ---------- Navegación ----------
+const titles={inicio:['Inicio','Hotel Reservas · prototipo'],disp:['Consultar disponibilidad','CU-03 · RF03'],conf:['Nueva reserva · Confirmación','CU-04, CU-05, CU-06 · RF04, RF05, RF16 impuestos'],habs:['Habitaciones','CU-11 · inventario y estados'],hist:['Historial y bitácora','CU-12 · RNF05 trazabilidad'],ia:['Asistente','Consultas en lenguaje natural · solo lectura']};
+function go(v){document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));document.getElementById('v-'+v).classList.add('on');document.querySelectorAll('.tabs div').forEach(x=>x.classList.remove('on'));const t=document.getElementById('t-'+(v==='conf'?'disp':v));if(t)t.classList.add('on');document.getElementById('title').textContent=titles[v][0];document.getElementById('subtitle').textContent=titles[v][1];if(v==='habs')renderHabs();if(v==='hist')renderHist();if(v==='inicio')kpis();document.querySelector('.content').scrollTop=0}
+function kpis(){const hoy='2026-10-15';document.getElementById('kOcu').textContent=habs.filter(h=>h.estado==='OCUPADA').length;document.getElementById('kDis').textContent=habs.filter(h=>h.estado==='DISPONIBLE').length;document.getElementById('kRes').textContent=reservas.filter(r=>r.estado==='CONFIRMADA').length;
+ document.getElementById('sRes').textContent=reservas.length;document.getElementById('sPag').textContent=pagos.length;document.getElementById('sCmp').textContent=comprobantes.length;document.getElementById('sBit').textContent=bitacora.length;document.getElementById('s409').textContent=conflictos;
+ document.getElementById('tReserva').innerHTML=reservas.map(r=>`<tr><td>${r.id}</td><td>${r.codigo}</td><td>${r.hab.numero}</td><td>${huespedes.find(h=>h.id===r.huesped).nombre.split(' ')[0]}</td><td>${r.entrada}</td><td>${r.salida}</td><td>${fmt(r.sub)}</td><td>${fmt(r.iva)}</td><td>${fmt(r.valor)}</td><td>${r.estado}</td><td>0x${r.ver.toString(16).padStart(8,'0')}</td></tr>`).join('')}
+// ---------- CU-03 Consultar disponibilidad ----------
+function buscar(){const tipoN=document.getElementById('fTipo').value,pers=+document.getElementById('fPers').value,ent=document.getElementById('fIn').value,sal=document.getElementById('fOut').value;
+ const tipoId=+Object.keys(tipos).find(k=>tipos[k].nombre===tipoN);const n=noches(ent,sal);const out=document.getElementById('resultados');
+ if(n<=0){out.innerHTML='<div class="err">La fecha de salida debe ser posterior a la de entrada (restricción CK_RESERVA_fechas).</div>';return}
+ if(pers>tipos[tipoId].cap){out.innerHTML=`<div class="err">El tipo ${tipoN} admite máximo ${tipos[tipoId].cap} persona(s).</div>`;return}
+ log(`GET /api/disponibilidad?tipo=${tipoN}&entrada=${ent}&salida=${sal}  → SELECT HABITACION h JOIN TARIFA … WHERE NOT EXISTS (reservas solapadas)`);
+ const lista=habs.filter(h=>h.tipo===tipoId);let html=`<h3>${tipoN} · ${n} noche${n>1?'s':''} · tarifa ${fmt(tipos[tipoId].tarifa)}/noche</h3>`;
+ lista.forEach(h=>{let st='Disponible',cls='',ok=true;if(h.estado==='MANTENIMIENTO'){st='Mantenimiento';cls='g';ok=false}else if(solapa(h,ent,sal)){st='Reservada';cls='o';ok=false}
+  html+=`<div class="card hab" ${ok?`onclick="elegir(${h.id},'${ent}','${sal}',${pers})"`:''}><div><b>Hab. ${h.numero} · Piso ${h.piso}</b><br><span class="lbl">${tipoN} · ${tipos[tipoId].cap} personas</span></div><div style="text-align:right"><span class="tag ${cls}">${st}</span><br>${ok?`<span class="pr">${fmt(calc(n*tipos[tipoId].tarifa).neto)}</span><br><span class="lbl" style="font-size:10px">neto · IVA 19 % incl.</span>`:''}</div></div>`});
+ html+='<div class="ok">Resultado calculado en el servidor con las reservas confirmadas y en casa. Los precios son netos (subtotal + IVA 19 %); el huésped extranjero no residente queda exento de IVA. Toque una habitación disponible para reservar.</div>';out.innerHTML=html;log(`  200 OK · ${lista.length} habitaciones evaluadas`)}
+function elegir(id,ent,sal,pers){const h=habs.find(x=>x.id===id);sel={hab:h,ent,sal,pers,n:noches(ent,sal),sub:noches(ent,sal)*tipos[h.tipo].tarifa};
+ document.getElementById('fHuesped').innerHTML=huespedes.map(x=>`<option value="${x.id}">${x.nombre}</option>`).join('');
+ if(pref){document.getElementById('fHuesped').value=pref.huesped;document.getElementById('fMedio').value=pref.medio}
+ huChange();document.getElementById('confRes').innerHTML='';go('conf')}
+document.getElementById('fHuesped').addEventListener('change',huChange);
+function huChange(){const h=huespedes.find(x=>x.id==document.getElementById('fHuesped').value);document.getElementById('huDoc').textContent=h.doc;
+ document.getElementById('fExento').checked=!!h.extranjero;
+ document.getElementById('freqTag').innerHTML=h.estadias>=2?`<span class="tag" style="margin-top:6px">★ Huésped frecuente · ${h.estadias} estadías</span>`:'';recalc()}
+// Desglose de impuestos (RF16): subtotal → IVA 19 % → precio neto
+function recalc(){if(!sel)return;const ex=document.getElementById('fExento').checked;const t=calc(sel.sub,ex);sel.iva=t.iva;sel.valor=t.neto;sel.exento=ex;const h=sel.hab;
+ document.getElementById('resumen').innerHTML=`<tr><td>Habitación</td><td>${h.numero} · ${tipos[h.tipo].nombre}</td></tr><tr><td>Entrada / salida</td><td>${sel.ent} → ${sel.sal}</td></tr><tr><td>Noches × tarifa</td><td>${sel.n} × ${fmt(tipos[h.tipo].tarifa)}</td></tr><tr><td>Personas</td><td>${sel.pers}</td></tr><tr><td>Subtotal alojamiento</td><td>${fmt(sel.sub)}</td></tr><tr><td>IVA 19 %${ex?' <span class="tag g" style="font-size:10px">EXENTO</span>':''}</td><td>${fmt(sel.iva)}</td></tr><tr><td style="font-weight:700">Precio neto</td><td style="color:var(--verde);font-size:15px">${fmt(sel.valor)}</td></tr>`;
+ document.getElementById('fPago').value=fmt(sel.valor)}
+// Texto del comprobante compartible (RF17)
+function textoCmp(r){const h=huespedes.find(x=>x.id===r.huesped);return `🏨 *Hotel Reservas* · Comprobante ${r.cmp}\nReserva: ${r.codigo}\nHuésped: ${h.nombre} (${h.doc})\nHabitación: ${r.hab.numero} · ${tipos[r.hab.tipo].nombre} · ${r.pers} persona${r.pers>1?'s':''}\nEntrada: ${r.entrada} · Salida: ${r.salida} (${noches(r.entrada,r.salida)} noche${noches(r.entrada,r.salida)>1?'s':''})\nSubtotal: ${fmt(r.sub)}\nIVA 19 %: ${r.exento?'exento (extranjero no residente)':fmt(r.iva)}\n*Precio neto: ${fmt(r.valor)}*\nPago: ${r.medio} · Estado: ${r.estado}\nPresente este comprobante en recepción. ¡Lo esperamos!`}
+function cardCmp(r){const h=huespedes.find(x=>x.id===r.huesped);const txt=textoCmp(r);const wa='https://wa.me/'+h.tel+'?text='+encodeURIComponent(txt);
+ return `<div class="card" style="margin-top:10px;border-color:var(--verde)"><span class="lbl">Comprobante ${r.cmp}</span><pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;margin:6px 0 0;line-height:1.4">${txt.replace(/\*/g,'')}</pre>
+ <a class="btn p" style="text-decoration:none;background:#25D366" href="${wa}" target="_blank" rel="noopener" onclick="log('GET /api/comprobantes/${r.cmp}/compartir → texto generado · abre WhatsApp (+${h.tel})')">Enviar comprobante por WhatsApp</a>
+ <button class="btn s" onclick="copiar(${r.id})">Copiar texto del comprobante</button></div>`}
+function copiar(id){const r=reservas.find(x=>x.id===id);const t=textoCmp(r);if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(()=>log(`[app] comprobante ${r.cmp} copiado al portapapeles`)).catch(()=>{});else{prompt('Copie el texto:',t)}}
+// Reserva rápida para huésped frecuente (RF18): documento → perfil → repetir última estadía
+function frecuente(){const d=document.getElementById('qDoc').value.replace(/\D/g,'');const out=document.getElementById('freqRes');if(!d){out.innerHTML='<div class="err">Digite el número de documento.</div>';return}
+ log(`GET /api/huespedes?documento=${d} → SELECT HUESPED + últimas RESERVA/PAGO (preferencias)`);const h=huespedes.find(x=>x.doc.replace(/\D/g,'')===d);
+ if(!h){out.innerHTML='<div class="err">Documento no registrado. Regístrelo desde Nueva reserva.</div>';log('  404 Not Found');return}
+ if(h.estadias<2||!h.ultima){out.innerHTML=`<div class="warn"><b>${h.nombre}</b> · ${h.estadias} estadía${h.estadias!==1?'s':''}. Aún no es huésped frecuente: cree la reserva normalmente.</div><button class="btn s" onclick="go('disp')">Nueva reserva</button>`;log('  200 OK · sin preferencias');return}
+ const u=h.ultima;log(`  200 OK · frecuente (${h.estadias} estadías) · última: ${tipos[u.tipo].nombre} ${u.hab}, ${u.noches} noche(s), pago ${u.medio}`);
+ out.innerHTML=`<div class="ok" style="margin-top:6px">★ <b>${h.nombre}</b> · huésped frecuente (${h.estadias} estadías)<br>Última estadía: hab. ${u.hab} ${tipos[u.tipo].nombre}, ${u.noches} noche${u.noches>1?'s':''}, ${u.pers} personas · pago ${u.medio}</div><button class="btn p" onclick="repetir(${h.id})">Repetir última estadía (1 toque)</button>`}
+function repetir(id){const h=huespedes.find(x=>x.id===id),u=h.ultima;pref={huesped:h.id,medio:u.medio};
+ document.getElementById('fTipo').value=tipos[u.tipo].nombre;document.getElementById('fPers').value=u.pers;const ent='2026-10-16';const sal=new Date(ent);sal.setDate(sal.getDate()+u.noches);document.getElementById('fIn').value=ent;document.getElementById('fOut').value=sal.toISOString().slice(0,10);
+ go('disp');buscar();document.getElementById('resultados').insertAdjacentHTML('afterbegin',`<div class="ok">Filtros precargados con las preferencias de <b>${h.nombre}</b>. Al elegir la habitación, el huésped y su medio de pago ya estarán seleccionados.</div>`)}
+// ---------- CU-04 Confirmar reserva (transacción) ----------
+function confirmar(){const out=document.getElementById('confRes');const hu=+document.getElementById('fHuesped').value,medio=document.getElementById('fMedio').value;
+ log(`POST /api/reservas {hab:${sel.hab.numero}, huesped:${hu}, ${sel.ent}→${sel.sal}}  → EXEC sp_ConfirmarReserva`);log('  SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; BEGIN TRANSACTION;');
+ if(conc){ // otra sesión gana la carrera
+  const t2=calc(sel.sub,false);const r={id:reservas.length+1,codigo:'RSV'+String(++seq).padStart(9,'0'),hab:sel.hab,huesped:2,entrada:sel.ent,salida:sel.sal,pers:sel.pers,sub:t2.sub,iva:t2.iva,valor:t2.neto,exento:false,medio:'EFECTIVO',cmp:'CMP'+String(reservas.length+1).padStart(9,'0'),estado:'CONFIRMADA',ver:version++};reservas.push(r);pagos.push({res:r.id,valor:r.valor,medio:'EFECTIVO'});comprobantes.push({res:r.id,num:r.cmp});bitacora.push({res:r.codigo,usuario:'recepcion2',de:'-',a:'CONFIRMADA',fecha:'15/10 '+hora()});
+  log(`  [sesión 2 · recepcion2] COMMIT ${r.codigo} sobre la habitación ${sel.hab.numero} (ganó el bloqueo UPDLOCK/HOLDLOCK)`);conc=false;document.getElementById('bConc').textContent='Activar';}
+ log(`  SELECT 1 FROM RESERVA WITH (UPDLOCK, HOLDLOCK) WHERE id_habitacion=${sel.hab.id} AND estado IN ('CONFIRMADA','EN_CASA') AND fecha_entrada<'${sel.sal}' AND fecha_salida>'${sel.ent}'`);
+ if(solapa(sel.hab,sel.ent,sel.sal)){conflictos++;log('  → existe solapamiento: ROLLBACK TRANSACTION; THROW 50001 "Habitación no disponible"');log('  409 Conflict · ninguna fila insertada en RESERVA, PAGO, COMPROBANTE ni BITACORA');
+  out.innerHTML=`<div class="err">✖ HTTP 409 · La habitación ${sel.hab.numero} ya no está disponible para esas fechas: otra recepcionista la confirmó un instante antes. No se guardó ningún dato. Vuelva a consultar la disponibilidad.</div>`;kpis();return}
+ const cmp='CMP'+String(reservas.length+1).padStart(9,'0');const r={id:reservas.length+1,codigo:'RSV'+String(++seq).padStart(9,'0'),hab:sel.hab,huesped:hu,entrada:sel.ent,salida:sel.sal,pers:sel.pers,sub:sel.sub,iva:sel.iva,valor:sel.valor,exento:sel.exento,medio,cmp,estado:'CONFIRMADA',ver:version++};reservas.push(r);
+ pagos.push({res:r.id,valor:r.valor,medio});comprobantes.push({res:r.id,num:cmp});bitacora.push({res:r.codigo,usuario:'recepcion1',de:'-',a:'CONFIRMADA',fecha:'15/10 '+hora()});
+ const hh=huespedes.find(x=>x.id===hu);hh.estadias++;hh.ultima={tipo:sel.hab.tipo,pers:sel.pers,medio,hab:sel.hab.numero,noches:sel.n,fecha:sel.ent};pref=null;
+ log(`  INSERT RESERVA(${r.codigo}, subtotal=${r.sub}, impuesto=${r.iva}${r.exento?' [exento IVA]':''}, valor_total=${r.valor}) · INSERT PAGO(${medio}, ${fmt(r.valor)}) · INSERT COMPROBANTE(${cmp}) · INSERT BITACORA_RESERVA(recepcion1, - → CONFIRMADA)`);log('  COMMIT TRANSACTION · 201 Created');
+ out.innerHTML=`<div class="ok">✔ Reserva <b>${r.codigo}</b> confirmada · Comprobante <b>${cmp}</b> · precio neto ${fmt(r.valor)} · Registrada por recepcionista turno 1</div>${cardCmp(r)}<button class="btn s" onclick="go('hist')">Ver en el historial</button>`;kpis()}
+function toggleConc(){conc=!conc;document.getElementById('bConc').textContent=conc?'Activada ✓':'Activar';log(conc?'[prueba] Otra sesión intentará la misma habitación en la próxima confirmación':'[prueba] Concurrencia desactivada')}
+function hora(){const d=new Date();return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')}
+// ---------- Habitaciones / historial ----------
+function renderHabs(){document.getElementById('habsList').innerHTML=[1,2,3,4,5].map(p=>`<h3>Piso ${p}</h3>`+habs.filter(h=>h.piso===p).map(h=>`<div class="card hab"><div><b>Hab. ${h.numero}</b><br><span class="lbl">${tipos[h.tipo].nombre} · ${tipos[h.tipo].cap} pers. · ${fmt(tipos[h.tipo].tarifa)}/noche</span></div><span class="tag ${h.estado==='OCUPADA'?'o':h.estado==='MANTENIMIENTO'?'g':''}">${h.estado}</span></div>`).join('')).join('')}
+function renderHist(){document.getElementById('histList').innerHTML=reservas.slice().reverse().map(r=>`<div class="card"><b>${r.codigo}</b> · Hab. ${r.hab.numero} · ${huespedes.find(h=>h.id===r.huesped).nombre}<br><span class="lbl">${r.entrada} → ${r.salida} · neto ${fmt(r.valor)} (IVA ${r.exento?'exento':fmt(r.iva)})</span> <span class="tag ${r.estado==='EN_CASA'?'o':''}">${r.estado}</span>${['CONFIRMADA','EN_CASA'].includes(r.estado)?`<button class="btn s" style="height:34px;font-size:12px" onclick="verCmp(${r.id})">Comprobante ${r.cmp} · compartir</button>`:''}${r.estado==='CONFIRMADA'?`<button class="btn s" style="height:34px;font-size:12px" onclick="checkin(${r.id})">Registrar check-in</button><button class="btn w" style="height:34px;font-size:12px" onclick="cancelar(${r.id})">Cancelar reserva</button>`:''}<div id="cmp${r.id}"></div></div>`).join('')||'<div class="card">Sin reservas.</div>';
+ document.getElementById('bitList').innerHTML='<table class="lst" style="width:100%">'+bitacora.slice().reverse().map(b=>`<tr><td>${b.fecha}</td><td>${b.res}</td><td>${b.de} → <b>${b.a}</b></td><td>${b.usuario}</td></tr>`).join('')+'</table>'}
+function verCmp(id){const el=document.getElementById('cmp'+id);el.innerHTML=el.innerHTML?'':cardCmp(reservas.find(x=>x.id===id))}
+function checkin(id){const r=reservas.find(x=>x.id===id);log(`PUT /api/reservas/${r.codigo}/checkin → BEGIN TRAN; UPDATE RESERVA SET estado='EN_CASA' WHERE id=${id} AND version_fila=0x${r.ver.toString(16).padStart(8,'0')}; UPDATE HABITACION SET estado='OCUPADA'; INSERT BITACORA; COMMIT`);r.estado='EN_CASA';r.ver=version++;r.hab.estado='OCUPADA';bitacora.push({res:r.codigo,usuario:'recepcion1',de:'CONFIRMADA',a:'EN_CASA',fecha:'15/10 '+hora()});renderHist();kpis()}
+function cancelar(id){const r=reservas.find(x=>x.id===id);log(`PUT /api/reservas/${r.codigo}/cancelar → BEGIN TRAN; UPDATE RESERVA SET estado='CANCELADA'; UPDATE PAGO SET estado='ANULADO'; INSERT BITACORA; COMMIT`);r.estado='CANCELADA';r.ver=version++;bitacora.push({res:r.codigo,usuario:'recepcion1',de:'CONFIRMADA',a:'CANCELADA',fecha:'15/10 '+hora()});renderHist();kpis()}
+// ---------- Asistente (lógica de integración simulada: interpreta → función → respuesta) ----------
+function ask(t){const q=t||document.getElementById('q').value.trim();if(!q)return;document.getElementById('q').value='';const chat=document.getElementById('chat');chat.innerHTML+=`<div class="msg me">${q}</div>`;
+ const s=q.toLowerCase();let fn='',ans='';
+ const tipo=s.includes('suite')?3:s.includes('sencilla')?1:2;const m=s.match(/(\d{1,2})\s*(?:al|a|-)\s*(\d{1,2})/);
+ if(/reserv(a|e|ar)\s+la|crea|confirma|modifica|cancela/.test(s)&&!/cu[aá]nt/.test(s)){fn='(ninguna: acción de escritura no permitida)';ans='No puedo crear, modificar ni cancelar reservas desde el asistente. Para confirmarla con verificación de disponibilidad y comprobante, use la pantalla <b>Reservas</b>.';}
+ else if(/cu[aá]nt(o|a)s? .*(reserva|confirmad)/.test(s)){fn='consultarReservas(estado=CONFIRMADA)';const n=reservas.filter(r=>r.estado==='CONFIRMADA').length;ans=`Hay <b>${n} reserva${n!==1?'s':''} confirmada${n!==1?'s':''}</b> y ${reservas.filter(r=>r.estado==='EN_CASA').length} huésped en casa.`}
+ else if(/cu[aá]nto|precio|cuesta|tarifa|vale/.test(s)){const nn=(s.match(/(\d+)\s*noche/)||[0,1])[1];fn=`consultarTarifa(tipo=${tipos[tipo].nombre}, noches=${nn})`;const t=calc(tipos[tipo].tarifa*nn);ans=`La tarifa vigente de la habitación <b>${tipos[tipo].nombre}</b> es ${fmt(tipos[tipo].tarifa)} por noche. Por ${nn} noche${nn>1?'s':''}: subtotal ${fmt(t.sub)} + IVA 19 % ${fmt(t.iva)} = <b>precio neto ${fmt(t.neto)}</b>. Si el huésped es extranjero no residente, el alojamiento queda exento de IVA y pagaría ${fmt(t.sub)}.`}
+ else if(/libre|disponib|hay/.test(s)){const ent=m?`2026-10-${m[1].padStart(2,'0')}`:'2026-10-16',sal=m?`2026-10-${m[2].padStart(2,'0')}`:'2026-10-18';fn=`consultarDisponibilidad(${tipos[tipo].nombre}, ${ent}, ${sal})`;const libres=habs.filter(h=>h.tipo===tipo&&h.estado!=='MANTENIMIENTO'&&!solapa(h,ent,sal));const ocup=habs.filter(h=>h.tipo===tipo&&(h.estado==='MANTENIMIENTO'||solapa(h,ent,sal)));
+  ans=`Para el ${ent} al ${sal} hay <b>${libres.length} habitación${libres.length!==1?'es':''} ${tipos[tipo].nombre.toLowerCase()} disponible${libres.length!==1?'s':''}</b>: ${libres.map(h=>h.numero).join(', ')||'ninguna'}. Tarifa ${fmt(tipos[tipo].tarifa)} por noche.${ocup.length?` No disponibles: ${ocup.map(h=>h.numero+(h.estado==='MANTENIMIENTO'?' (mantenimiento)':' (reservada)')).join(', ')}.`:''}`}
+ else{fn='(aclaración)';ans='¿Podría indicarme el tipo de habitación y las fechas? Por ejemplo: "¿qué dobles hay libres del 16 al 18?"'}
+ log(`POST /api/asistente "${q}" → modelo IA devuelve función: ${fn} → la API la ejecuta y registra en CONSULTA_ASISTENTE`);
+ setTimeout(()=>{chat.innerHTML+=`<div class="msg ia">${ans}<small>Fuente: ${fn} · datos del repositorio central</small></div>`;document.querySelector('.content').scrollTop=1e6},350)}
+// ---------- init ----------
+seed();kpis();document.getElementById('clock').textContent=hora();
+function toggleSrv(){const o=document.getElementById('srv').classList.toggle('on');document.getElementById('fabSrv').style.display=o?'none':''}
+(function(){const q=new URLSearchParams(location.search);if(q.get('apk')==='1'){document.body.classList.add('apk');const v=q.get('vista');if(v&&document.getElementById('v-'+v))go(v)}})();
+</script>
+</body></html>

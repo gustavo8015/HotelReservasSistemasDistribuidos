@@ -1,0 +1,257 @@
+@inject ApiClient Api
+@inject Sesion Sesion
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IDisposable
+
+@* Ventana flotante del asistente, disponible en todas las pantallas.
+   La pantalla completa /asistente sigue existiendo: esta ventana es el acceso rápido y comparte
+   con ella los textos de AsistentePerfil y el mismo recurso de la API, de modo que el catálogo
+   por perfil y el registro en CONSULTA_ASISTENTE se aplican igual.
+
+   El consentimiento del artículo 9 de la Ley 1581 de 2012 se pide antes del primer mensaje:
+   hasta que el visitante acepte, el cuadro de texto está deshabilitado y nada sale del navegador. *@
+
+@if (!EnLaPantallaCompleta)
+{
+    @if (abierto)
+    {
+        <section class="asis" role="dialog" aria-modal="false" aria-labelledby="asis-titulo" @onkeydown="AlTeclear">
+            <header class="asis-top">
+                <img class="asis-cara" src="img/asistente.svg" width="76" height="76" alt="" aria-hidden="true" />
+                <span class="asis-enlinea" aria-hidden="true"></span>
+                @* Se dice que es automático: el visitante tiene derecho a saber que no hay una
+                   persona al otro lado, y además evita parecerse al encabezado de otro hotel. *@
+                <p class="asis-horario">Asistente automático · disponible siempre</p>
+                <h2 id="asis-titulo">Hotel Reservas · @AsistentePerfil.Etiqueta(EsPersonal, Sesion.Activa)</h2>
+                <button class="asis-min" @onclick="Minimizar" aria-label="Minimizar el asistente">
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                        <path d="M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none" />
+                    </svg>
+                </button>
+            </header>
+
+            <div class="asis-cuerpo" @ref="cuerpo" role="log" aria-live="polite" aria-label="Conversación con el asistente">
+                <div class="asis-msg asis-ia">
+                    <img src="img/asistente.svg" width="30" height="30" alt="" aria-hidden="true" />
+                    <div>
+                        <p>@AsistentePerfil.Saludo(EsPersonal, Sesion.Activa)</p>
+                        @if (consentimiento == null)
+                        {
+                            <p class="asis-aviso">
+                                Al continuar, usted autoriza el tratamiento de sus datos personales conforme a la
+                                política de la Ley 1581 de 2012. El asistente es de solo consulta y antes de procesar
+                                su pregunta borra documentos, teléfonos y correos. No guardamos el contenido
+                                de su conversación con fines distintos de atender la consulta.
+                            </p>
+                        }
+                    </div>
+                </div>
+
+                @foreach (var m in historial)
+                {
+                    <div class="asis-msg @(m.Mio ? "asis-yo" : "asis-ia")">
+                        @if (!m.Mio)
+                        {
+                            <img src="img/asistente.svg" width="30" height="30" alt="" aria-hidden="true" />
+                        }
+                        <div>
+                            <p>@m.Texto</p>
+                            @if (m.Fuente != null)
+                            {
+                                <small>@m.Fuente</small>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (ocupado)
+                {
+                    <div class="asis-msg asis-ia">
+                        <img src="img/asistente.svg" width="30" height="30" alt="" aria-hidden="true" />
+                        <div><p class="asis-puntos"><span></span><span></span><span></span></p></div>
+                    </div>
+                }
+            </div>
+
+            @if (consentimiento == null)
+            {
+                <div class="asis-consent">
+                    <button class="btn primario" @ref="botonAceptar" @onclick="Aceptar">Aceptar</button>
+                    <button class="btn claro" @onclick="Rechazar">Rechazar</button>
+                </div>
+            }
+            else if (consentimiento == false)
+            {
+                <div class="asis-consent">
+                    <p class="secundario">No se enviará ninguna consulta. Puede reservar y consultar su comprobante sin usar el asistente.</p>
+                    <button class="btn claro" @onclick="Aceptar">Cambiar de opinión</button>
+                </div>
+            }
+            else
+            {
+                <div class="asis-chips">
+                    @foreach (var s in AsistentePerfil.Sugerencias(EsPersonal, Sesion.Activa).Take(3))
+                    {
+                        <button @onclick="() => Preguntar(s)" disabled="@ocupado">@s</button>
+                    }
+                </div>
+
+                <form class="asis-pie" @onsubmit="Enviar" @onsubmit:preventDefault>
+                    <label class="oculto-visual" for="asis-q">Escriba su consulta</label>
+                    <input id="asis-q" @ref="caja" @bind="consulta" @bind:event="oninput" autocomplete="off"
+                           spellcheck="false" placeholder="Escriba su mensaje…" />
+                    <button type="submit" class="asis-enviar" disabled="@(ocupado || consulta.Trim().Length == 0)"
+                            aria-label="Enviar la consulta">
+                        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                            <path d="M3 11.5 21 3l-8.5 18-2.2-7.3z" fill="currentColor" />
+                        </svg>
+                    </button>
+                </form>
+            }
+
+            <p class="asis-nota">Solo consulta · intérprete @(estado?.Interprete ?? "…")@(string.IsNullOrEmpty(estado?.Version) ? "" : " · API " + estado!.Version) · <a href="asistente">abrir en pantalla completa</a></p>
+        </section>
+    }
+    else
+    {
+        <button class="asis-burbuja" @onclick="Abrir" aria-label="@TextoBurbuja">
+            <img src="img/asistente.svg" width="56" height="56" alt="" aria-hidden="true" />
+            <span class="asis-enlinea" aria-hidden="true"></span>
+            @if (sinLeer > 0)
+            {
+                <span class="asis-globo" aria-hidden="true">@sinLeer</span>
+            }
+        </button>
+    }
+}
+
+@code {
+    private record Mensaje(string Texto, bool Mio, string? Fuente);
+
+    // Estáticos a propósito: la ventana se destruye y se vuelve a crear al cambiar de pantalla,
+    // y la conversación del visitante no debería perderse por navegar al catálogo y volver.
+    private static readonly List<Mensaje> historial = new();
+    private static bool? consentimiento;
+    private static bool abierto;
+    private static bool visitaAnunciada;
+
+    private string consulta = "";
+    private bool ocupado;
+    private int sinLeer;
+    private EstadoAsistente? estado;
+    private ElementReference caja;
+    private ElementReference cuerpo;
+    private ElementReference botonAceptar;
+    private bool enfocar;
+    private bool enfocarConsentimiento;
+
+    private bool EsPersonal => Sesion.EsAdministrador;
+
+    /// <summary>En /asistente la ventana sobra: allí ya está el asistente completo.</summary>
+    private bool EnLaPantallaCompleta =>
+        Nav.ToBaseRelativePath(Nav.Uri).TrimEnd('/').StartsWith("asistente", StringComparison.OrdinalIgnoreCase);
+
+    private string TextoBurbuja => sinLeer > 0
+        ? "Abrir el asistente del hotel. Tiene un mensaje sin leer."
+        : "Abrir el asistente del hotel";
+
+    protected override void OnInitialized()
+    {
+        Sesion.Cambio += AlCambiarSesion;
+        Nav.LocationChanged += AlNavegar;
+        // El saludo cuenta como un mensaje sin leer la primera vez, igual que en la pantalla de
+        // un hotel real: así el visitante nota que el asistente está ahí sin que nada se le abra encima.
+        if (!visitaAnunciada && !abierto) { sinLeer = 1; visitaAnunciada = true; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { estado = await Api.EstadoAsistenteAsync(); } catch (ApiException) { }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (abierto)
+        {
+            try { await JS.InvokeVoidAsync("hrFinDelChat", cuerpo); } catch (JSException) { }
+        }
+        if (enfocar)
+        {
+            enfocar = false;
+            try { await caja.FocusAsync(); } catch (InvalidOperationException) { }
+        }
+        if (enfocarConsentimiento)
+        {
+            enfocarConsentimiento = false;
+            try { await botonAceptar.FocusAsync(); } catch (InvalidOperationException) { }
+        }
+    }
+
+    private void AlCambiarSesion()
+    {
+        // Al iniciar o cerrar sesión cambia el catálogo del perfil, de modo que la conversación
+        // anterior ya no corresponde a quien está ahora al teclado.
+        historial.Clear();
+        _ = RefrescarEstado();
+        StateHasChanged();
+    }
+
+    private async Task RefrescarEstado()
+    {
+        try { estado = await Api.EstadoAsistenteAsync(); } catch (ApiException) { }
+        StateHasChanged();
+    }
+
+    private void AlNavegar(object? remitente, LocationChangedEventArgs e) => StateHasChanged();
+
+    // Al abrir, el foco del teclado entra a la ventana: al cuadro de texto si ya hay
+    // consentimiento, y si no al botón Aceptar, que es la decisión que toca tomar primero.
+    private void Abrir()
+    {
+        abierto = true; sinLeer = 0;
+        enfocar = consentimiento == true;
+        enfocarConsentimiento = consentimiento == null;
+    }
+
+    /// <summary>Escape minimiza la ventana, como en cualquier diálogo.</summary>
+    private void AlTeclear(KeyboardEventArgs e) { if (e.Key == "Escape") Minimizar(); }
+
+    private void Minimizar() { abierto = false; }
+
+    private void Aceptar() { consentimiento = true; enfocar = true; }
+
+    private void Rechazar() { consentimiento = false; }
+
+    private Task Enviar() => Preguntar(null);
+
+    private async Task Preguntar(string? texto)
+    {
+        if (consentimiento != true) return;
+        var q = (texto ?? consulta).Trim();
+        if (q.Length == 0 || ocupado) return;
+        consulta = "";
+        historial.Add(new(q, true, null));
+        ocupado = true;
+        try
+        {
+            var r = await Api.AsistenteAsync(q);
+            historial.Add(new(r.Respuesta, false, $"{r.Funcion ?? "aclaración"} · {r.Interprete} · {r.DuracionMs} ms"));
+        }
+        catch (ApiException ex)
+        {
+            historial.Add(new("No fue posible consultar al asistente: " + ex.Message, false, null));
+        }
+        finally
+        {
+            ocupado = false;
+            enfocar = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        Sesion.Cambio -= AlCambiarSesion;
+        Nav.LocationChanged -= AlNavegar;
+    }
+}

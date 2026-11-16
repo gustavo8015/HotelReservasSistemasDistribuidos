@@ -1,0 +1,85 @@
+### Portal del usuario final (CU-16 / RF21)
+### Ninguna de las primeras llamadas necesita token: son publicas.
+@host = http://localhost:5080
+
+### 1. Catalogo con fotos y precios para un rango de fechas
+GET {{host}}/api/portal/catalogo?entrada=2026-11-02&salida=2026-11-04&personas=2
+
+### 2. El portal reconoce a un huesped que ya se hospedo
+GET {{host}}/api/portal/huespedes/1010101010
+
+### 3. Reserva pagada con tarjeta aprobada, comprobante por correo
+POST {{host}}/api/portal/reservas
+Content-Type: application/json
+
+{
+  "huesped": { "tipoDocumento": "CC", "numeroDocumento": "1010101010", "nombres": "Laura", "apellidos": "Martínez Pérez",
+               "telefono": "3001112233", "correo": "laura.martinez@correo.com", "extranjeroNoResidente": false },
+  "idTipo": 2, "fechaEntrada": "2026-11-02", "fechaSalida": "2026-11-04", "numeroPersonas": 2,
+  "medioPago": "TARJETA",
+  "tarjeta": { "numero": "4111111111111111", "titular": "LAURA MARTINEZ", "vencimiento": "12/29", "cvv": "123" },
+  "canalComprobante": "CORREO", "destinoComprobante": "laura.martinez@correo.com"
+}
+
+### 4. Tarjeta terminada en 0000: la pasarela responde 402 y no se crea ninguna reserva
+POST {{host}}/api/portal/reservas
+Content-Type: application/json
+
+{
+  "huesped": { "tipoDocumento": "CC", "numeroDocumento": "4040404040", "nombres": "Pedro", "apellidos": "Ruiz",
+               "telefono": "3005556677", "correo": "pedro.ruiz@correo.com", "extranjeroNoResidente": false },
+  "idTipo": 2, "fechaEntrada": "2026-12-01", "fechaSalida": "2026-12-03", "numeroPersonas": 2,
+  "medioPago": "TARJETA",
+  "tarjeta": { "numero": "4000000000000000", "titular": "PEDRO RUIZ", "vencimiento": "12/29", "cvv": "123" },
+  "canalComprobante": "CORREO", "destinoComprobante": "pedro.ruiz@correo.com"
+}
+
+### 5. Reserva pagada en efectivo, comprobante por WhatsApp
+POST {{host}}/api/portal/reservas
+Content-Type: application/json
+
+{
+  "huesped": { "tipoDocumento": "CC", "numeroDocumento": "5050505050", "nombres": "Marta", "apellidos": "Lopez",
+               "telefono": "3017778899", "correo": null, "extranjeroNoResidente": false },
+  "idTipo": 1, "fechaEntrada": "2026-11-10", "fechaSalida": "2026-11-11", "numeroPersonas": 1,
+  "medioPago": "EFECTIVO", "canalComprobante": "WHATSAPP", "destinoComprobante": "3017778899"
+}
+
+### 6. Recuperar el comprobante sin cuenta (el documento hace de clave)
+GET {{host}}/api/portal/comprobantes/CMP000000031?documento=1010101010
+
+### 7. Crear la cuenta del usuario final
+POST {{host}}/api/auth/registro
+Content-Type: application/json
+
+{ "tipoDocumento": "CC", "numeroDocumento": "6060606060", "nombres": "Juan", "apellidos": "Perez",
+  "telefono": "3009998877", "correo": "juan.perez@correo.com", "clave": "Cliente2026*", "extranjeroNoResidente": false }
+
+### 8. Iniciar sesion como cliente
+# @name loginCliente
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "correo": "laura@correo.com", "clave": "Cliente2026*" }
+
+### 9. Mis reservas (solo del huesped ligado a la cuenta)
+GET {{host}}/api/portal/mis-reservas
+Authorization: Bearer {{loginCliente.response.body.token}}
+
+### 10. El cliente no puede entrar a la operacion interna: responde 403
+GET {{host}}/api/reservas
+Authorization: Bearer {{loginCliente.response.body.token}}
+
+### 11. Administrador: cambiar la foto del catalogo
+# @name loginAdmin
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "correo": "admin@hotel.com", "clave": "Hotel2026*" }
+
+###
+PUT {{host}}/api/admin/tipos/3
+Authorization: Bearer {{loginAdmin.response.body.token}}
+Content-Type: application/json
+
+{ "descripcion": "Sala independiente, cama king, balcón con vista al mar y wifi.", "imagen": "img/habitaciones/suite.svg" }

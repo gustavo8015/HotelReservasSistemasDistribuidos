@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Banco de pruebas del sistema. No usa ninguna biblioteca externa: todo lo que necesita
+       (HttpClient, System.Text.Json, Stopwatch, Parallel) viene en la biblioteca base de .NET 8.
+       Así se ejecuta en cualquier equipo con el SDK instalado, sin descargar paquetes. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HotelReservas.Pruebas</RootNamespace>
+    <AssemblyName>Pruebas</AssemblyName>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

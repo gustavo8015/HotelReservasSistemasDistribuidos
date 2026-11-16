@@ -1,0 +1,128 @@
+﻿@page "/asistente"
+@inject ApiClient Api
+@inject Sesion Sesion
+
+<PageTitle>Asistente · Hotel Reservas</PageTitle>
+
+@* Sección 13: asistente de consultas, de solo lectura. La misma pantalla sirve a los tres
+   perfiles; lo que cambia es el catálogo de funciones que la API entrega según el rol del
+   token, de modo que el huésped nunca ve cifras de operación del hotel ni reservas ajenas. *@
+
+<div class="encabezado">
+    <h2>Asistente</h2>
+    <span class="chip">@Etiqueta · solo consulta</span>
+    <span class="sub">@Subtitulo</span>
+</div>
+
+<div class="grid g21">
+    <div class="tarjeta">
+        <div class="chat">
+            <div class="msg ia">
+                @Saludo
+                <small>Funciones de solo lectura · intérprete: @(estado?.Interprete ?? "…")</small>
+            </div>
+            @foreach (var m in mensajes)
+            {
+                <div class="msg @(m.Mio ? "yo" : "ia")">@m.Texto @if (m.Fuente != null) { <small>@m.Fuente</small> }</div>
+            }
+            @if (ocupado) { <div class="msg ia">Consultando…</div> }
+        </div>
+
+        <div class="chips" style="margin:12px 0">
+            @foreach (var s in Sugerencias) { <button @onclick="() => Preguntar(s)" disabled="@ocupado">@s</button> }
+        </div>
+
+        <div class="fila">
+            <div class="campo" style="flex:1">
+                <label for="q">Consulta</label>
+                <input id="q" @bind="consulta" @bind:event="oninput" @onkeydown="Enter" autocomplete="off"
+                       placeholder="Escriba su consulta en lenguaje natural…" />
+            </div>
+            <button class="btn primario" @onclick="() => Preguntar(null)" disabled="@ocupado">Enviar</button>
+        </div>
+    </div>
+
+    <div class="tarjeta">
+        <h3>Cómo funciona</h3>
+        <p class="secundario" style="margin-top:8px">
+            El orquestador borra de la consulta los documentos, teléfonos y correos antes de que salga
+            del hotel, que es el principio de minimización del artículo 4 literal f de la Ley 1581 de
+            2012. Después pide al modelo qué función ejecutar, valida que esa función esté en el
+            catálogo de su perfil, la ejecuta sobre SQL Server, registra la consulta en
+            CONSULTA_ASISTENTE y devuelve la respuesta indicando de qué función salió.
+        </p>
+        <p class="secundario" style="margin-top:8px">
+            Nunca crea, modifica ni cancela reservas, ni registra pagos. Esas operaciones tienen sus
+            propias pantallas, donde la disponibilidad se verifica con bloqueo y queda comprobante.
+        </p>
+
+        <h3 style="margin-top:14px">Qué puedo preguntarle</h3>
+        <ul class="comodidades" style="grid-template-columns:1fr">
+            @foreach (var f in Alcance) { <li>@f</li> }
+        </ul>
+
+        <h3 style="margin-top:14px">Estado</h3>
+        @if (estado != null)
+        {
+            <p class="secundario" style="margin-top:8px">
+                Intérprete activo: <b>@estado.Interprete</b>.
+                @if (estado.ModeloConfigurado)
+                {
+                    <text>Hay un modelo externo configurado (@estado.Proveedor).</text>
+                }
+                else
+                {
+                    <text>No hay modelo externo configurado, así que responde el intérprete de reglas,
+                    que no necesita internet ni cuenta. Entiende menos variantes de la misma pregunta,
+                    pero consulta exactamente los mismos datos.</text>
+                }
+                Perfil atendido: <b>@estado.Perfil</b> · @estado.Funciones funciones disponibles.
+                @if (!string.IsNullOrEmpty(estado.Version))
+                {
+                    <text>Versión del asistente en la API: <b>@estado.Version</b>.</text>
+                }
+            </p>
+        }
+    </div>
+</div>
+
+@code {
+    private record Mensaje(string Texto, bool Mio, string? Fuente);
+    private readonly List<Mensaje> mensajes = new();
+    private string consulta = "";
+    private bool ocupado;
+    private EstadoAsistente? estado;
+
+    private bool EsPersonal => Sesion.EsAdministrador;
+
+    // Los textos por perfil viven en AsistentePerfil para que esta pantalla y la ventana
+    // flotante digan exactamente lo mismo.
+    private string Etiqueta => AsistentePerfil.Etiqueta(EsPersonal, Sesion.Activa);
+    private string Subtitulo => AsistentePerfil.Subtitulo(EsPersonal, Sesion.Activa);
+    private string Saludo => AsistentePerfil.Saludo(EsPersonal, Sesion.Activa);
+    private string[] Sugerencias => AsistentePerfil.Sugerencias(EsPersonal, Sesion.Activa);
+    private string[] Alcance => AsistentePerfil.Alcance(EsPersonal, Sesion.Activa);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { estado = await Api.EstadoAsistenteAsync(); } catch (ApiException) { }
+    }
+
+    private Task Enter(KeyboardEventArgs e) => e.Key == "Enter" ? Preguntar(null) : Task.CompletedTask;
+
+    private async Task Preguntar(string? texto)
+    {
+        var q = (texto ?? consulta).Trim();
+        if (q.Length == 0 || ocupado) return;
+        consulta = "";
+        mensajes.Add(new(q, true, null));
+        ocupado = true;
+        try
+        {
+            var r = await Api.AsistenteAsync(q);
+            mensajes.Add(new(r.Respuesta, false, $"Fuente: {r.Funcion ?? "(aclaración)"} · intérprete {r.Interprete} · {r.DuracionMs} ms"));
+        }
+        catch (ApiException ex) { mensajes.Add(new("No fue posible consultar al asistente: " + ex.Message, false, null)); }
+        finally { ocupado = false; }
+    }
+}

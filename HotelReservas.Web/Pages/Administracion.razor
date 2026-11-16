@@ -1,0 +1,676 @@
+@page "/administracion"
+@inject ApiClient Api
+@inject Sesion Sesion
+
+<PageTitle>Administración · Hotel Reservas</PageTitle>
+
+<div class="encabezado"><h2>Administración</h2><span class="chip">ADMINISTRADOR</span>
+    <span class="sub">Cree, edite y elimine precios por tipo, habitaciones, huéspedes y reservas.</span></div>
+
+<RequiereSesion>
+@if (!Sesion.EsAdministrador)
+{
+    <div class="tarjeta">
+        <h3>Acceso restringido</h3>
+        <p class="secundario">Este módulo es exclusivo del rol ADMINISTRADOR. Su sesión tiene el rol <b>@Sesion.Rol</b>. Los recursos <span class="mono">api/admin/*</span> responden 403 Forbidden a cualquier otro rol.</p>
+    </div>
+}
+else
+{
+    <div class="tarjeta" style="margin-bottom:12px">
+        <div class="chips">
+            <button class="@(seccion == "precios" ? "sel" : "")" @onclick='() => seccion = "precios"'>Precios y tarifas</button>
+            <button class="@(seccion == "habitaciones" ? "sel" : "")" @onclick='() => seccion = "habitaciones"'>Habitaciones</button>
+            <button class="@(seccion == "huespedes" ? "sel" : "")" @onclick='() => seccion = "huespedes"'>Huéspedes</button>
+            <button class="@(seccion == "reservas" ? "sel" : "")" @onclick='() => seccion = "reservas"'>Reservas</button>
+            <button class="@(seccion == "fotos" ? "sel" : "")" @onclick='() => seccion = "fotos"'>Fotos del catálogo</button>
+        </div>
+    </div>
+
+    @if (aviso != null) { <div class="nota @(avisoError ? "error" : "ok")" role="@(avisoError ? "alert" : "status")" style="margin-bottom:12px">@aviso</div> }
+
+    @* ============================= FOTOS ============================= *@
+    @if (seccion == "fotos")
+    {
+        <div class="tarjeta" style="margin-bottom:12px">
+            <h3>Fotos que ve el huésped</h3>
+            <p class="secundario" style="margin-top:6px">
+                Cada tipo de habitación tiene una galería: la primera foto encabeza el catálogo y las demás
+                aparecen en la ficha. Para usar fotografías propias, copie los archivos en la carpeta
+                <span class="mono">HotelReservas.Web/wwwroot/img/habitaciones</span> y escriba aquí el nombre
+                del archivo, por ejemplo <span class="mono">suite-balcon.jpg</span>. También se admite una
+                dirección http completa si la foto está publicada en internet.
+            </p>
+        </div>
+
+        @foreach (var t in tipos)
+        {
+            <div class="tarjeta" style="margin-bottom:12px">
+                <h3>@t.Nombre</h3>
+
+                <div class="galeria-admin">
+                    @foreach (var f in FotosDe(t.IdTipo))
+                    {
+                        <figure>
+                            <img src="@f.Ruta" alt="@(f.Descripcion ?? t.Nombre)" width="320" height="240" loading="lazy" />
+                            <figcaption class="mono">@f.Ruta</figcaption>
+                            <div class="acciones">
+                                @if (f.Orden == 1)
+                                {
+                                    <span class="chip ok">Portada</span>
+                                }
+                                else
+                                {
+                                    <button class="btn chico" @onclick="() => Portada(t.IdTipo, f)" disabled="@ocupado">Usar de portada</button>
+                                }
+                                <button class="btn chico" @onclick="() => QuitarFoto(t.IdTipo, f)" disabled="@ocupado">Quitar</button>
+                            </div>
+                        </figure>
+                    }
+                    @if (FotosDe(t.IdTipo).Count == 0)
+                    {
+                        <p class="secundario">Este tipo todavía no tiene fotos.</p>
+                    }
+                </div>
+
+                <div class="fila" style="margin-top:14px">
+                    <div class="campo"><label for="ruta@t.IdTipo">Archivo o dirección de la foto</label>
+                        <input id="ruta@t.IdTipo" class="mono" list="archivos-sugeridos" placeholder="suite-balcon.jpg"
+                               autocomplete="off" spellcheck="false" @bind="rutaNueva" /></div>
+                    <div class="campo"><label for="desc@t.IdTipo">Qué muestra</label>
+                        <input id="desc@t.IdTipo" placeholder="Balcón con vista al mar" @bind="descripcionNueva" /></div>
+                    <button class="btn primario" @onclick="() => AgregarFoto(t.IdTipo)" disabled="@ocupado">Agregar foto</button>
+                </div>
+
+                <div class="fila" style="margin-top:10px">
+                    <div class="campo"><label for="dt@t.IdTipo">Descripción del tipo</label>
+                        <input id="dt@t.IdTipo" value="@t.Descripcion" @onchange="e => t.Descripcion = e.Value?.ToString()" /></div>
+                    <button class="btn" @onclick="() => GuardarTipo(t)" disabled="@ocupado">Guardar descripción</button>
+                </div>
+            </div>
+        }
+
+        <datalist id="archivos-sugeridos">
+            @foreach (var a in ImagenesDisponibles) { <option value="@a"></option> }
+        </datalist>
+    }
+
+    @* ============================= PRECIOS ============================= *@
+    @if (seccion == "precios")
+    {
+        <div class="grid g21">
+            <div class="tarjeta">
+                <h3>Histórico de precios</h3>
+                <p class="secundario" style="margin-top:4px">Al registrar un precio nuevo, el anterior se cierra el día previo. Las reservas ya confirmadas conservan el precio con el que se vendieron, porque cada reserva guarda su propio subtotal, IVA y valor total. Cualquier tarifa se puede eliminar; si cerraba una anterior, esa anterior recupera el periodo. No se permite borrar la única tarifa de un tipo que todavía tiene habitaciones, porque la consulta de disponibilidad quedaría sin precio.</p>
+                @if (tarifas == null) { <p class="secundario" style="margin-top:10px">Cargando…</p> }
+                else
+                {
+                    <div class="tabla" style="margin-top:10px"><table>
+                        <tr><th>Tipo</th><th>Valor por noche</th><th>Desde</th><th>Hasta</th><th>Estado</th><th></th></tr>
+                        @foreach (var t in tarifas)
+                        {
+                            <tr>
+                                <td><b>@t.Tipo</b></td>
+                                <td class="mono">@ApiClient.Moneda(t.ValorNoche)</td>
+                                <td class="mono">@t.VigenciaDesde.ToString("yyyy-MM-dd")</td>
+                                <td class="mono">@(t.VigenciaHasta?.ToString("yyyy-MM-dd") ?? "sin cierre")</td>
+                                <td>
+                                    @if (t.Vigente) { <span class="chip ok">Vigente</span> }
+                                    else if (t.Futura) { <span class="chip naranja">Futura</span> }
+                                    else { <span class="chip">Histórica</span> }
+                                </td>
+                                <td style="white-space:nowrap">
+                                    @if (confirmTar == t.IdTarifa)
+                                    {
+                                        <button class="btn chico primario" @onclick="() => EliminarTarifa(t)" disabled="@ocupado">Sí, eliminar</button>
+                                        <button class="btn chico" @onclick="() => { confirmTar = null; }">No</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn chico" @onclick="() => { confirmTar = t.IdTarifa; }" disabled="@ocupado">Eliminar</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </table></div>
+                }
+            </div>
+
+            <div class="tarjeta">
+                <h3>Registrar precio</h3>
+                <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+                    <div class="campo"><label for="tp">Tipo de habitación</label>
+                        <select id="tp" @bind="nuevaTarifa.IdTipo">
+                            @foreach (var t in tipos) { <option value="@t.IdTipo">@t.Nombre · capacidad @t.Capacidad</option> }
+                        </select>
+                    </div>
+                    <div class="campo"><label for="vn">Valor por noche (antes de IVA)</label>
+                        <input id="vn" type="number" min="1" step="1000" @bind="nuevaTarifa.ValorNoche" /></div>
+                    <div class="campo"><label for="vd">Rige desde</label>
+                        <input id="vd" type="date" @bind="nuevaTarifa.VigenciaDesde" /></div>
+                    <button class="btn primario" @onclick="GuardarTarifa" disabled="@ocupado">Guardar precio</button>
+                </div>
+                <h3 style="margin-top:16px">Tipos</h3>
+                <div class="tabla" style="margin-top:8px"><table>
+                    <tr><th>Tipo</th><th>Cap.</th><th>Habs.</th><th>Vigente</th></tr>
+                    @foreach (var t in tipos)
+                    {
+                        <tr><td><b>@t.Nombre</b></td><td>@t.Capacidad</td><td>@t.Habitaciones</td>
+                            <td class="mono">@(t.TarifaVigente == null ? "sin tarifa" : ApiClient.Moneda(t.TarifaVigente.Value))</td></tr>
+                    }
+                </table></div>
+            </div>
+        </div>
+    }
+
+    @* ========================== HABITACIONES ========================== *@
+    @if (seccion == "habitaciones")
+    {
+        <div class="grid g21">
+            <div class="tarjeta">
+                <h3>Inventario</h3>
+                <p class="secundario" style="margin-top:4px">Una habitación sin reservas se elimina definitivamente. Si ya tiene historial pasa a MANTENIMIENTO y deja de ofrecerse, para conservar la trazabilidad.</p>
+                @if (habitaciones == null) { <p class="secundario" style="margin-top:10px">Cargando…</p> }
+                else
+                {
+                    <div class="tabla" style="margin-top:10px"><table>
+                        <tr><th>N.º</th><th>Piso</th><th>Tipo</th><th>Estado</th><th>Reservas</th><th>Acciones</th></tr>
+                        @foreach (var h in habitaciones)
+                        {
+                            @if (editHabId == h.IdHabitacion)
+                            {
+                                <tr>
+                                    <td><input style="width:80px" @bind="editHab.Numero" /></td>
+                                    <td><input type="number" style="width:70px" @bind="editHab.Piso" /></td>
+                                    <td><select @bind="editHab.IdTipo">@foreach (var t in tipos) { <option value="@t.IdTipo">@t.Nombre</option> }</select></td>
+                                    <td><select @bind="editHab.Estado"><option>DISPONIBLE</option><option>OCUPADA</option><option>MANTENIMIENTO</option></select></td>
+                                    <td class="secundario">@h.Reservas</td>
+                                    <td style="white-space:nowrap">
+                                        <button class="btn chico primario" @onclick="() => GuardarHabitacion(h)" disabled="@ocupado">Guardar</button>
+                                        <button class="btn chico" @onclick="() => { editHabId = null; }">Cancelar</button>
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td><b>@h.Numero</b></td>
+                                    <td>@h.Piso</td>
+                                    <td>@h.Tipo <small class="secundario">(@h.Capacidad p.)</small></td>
+                                    <td><span class="chip @(h.Estado == "DISPONIBLE" ? "ok" : h.Estado == "OCUPADA" ? "naranja" : "rojo")">@h.Estado</span></td>
+                                    <td class="secundario">@h.Reservas total · @h.ReservasActivas activa(s)</td>
+                                    <td style="white-space:nowrap">
+                                        @if (confirmHab == h.IdHabitacion)
+                                        {
+                                            <button class="btn chico primario" @onclick="() => EliminarHabitacion(h)" disabled="@ocupado">Sí, @(h.Reservas > 0 ? "retirar" : "eliminar")</button>
+                                            <button class="btn chico" @onclick="() => { confirmHab = null; }">No</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn chico" @onclick="() => EditarHabitacion(h)">Editar</button>
+                                            <button class="btn chico" @onclick="() => { confirmHab = h.IdHabitacion; }">Eliminar</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </table></div>
+                }
+            </div>
+
+            <div class="tarjeta">
+                <h3>Crear habitación</h3>
+                <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+                    <div class="campo"><label for="nh">Número</label><input id="nh" @bind="nuevaHab.Numero" placeholder="Ej. 402" /></div>
+                    <div class="campo"><label for="ph">Piso</label><input id="ph" type="number" min="0" @bind="nuevaHab.Piso" /></div>
+                    <div class="campo"><label for="th">Tipo</label>
+                        <select id="th" @bind="nuevaHab.IdTipo">@foreach (var t in tipos) { <option value="@t.IdTipo">@t.Nombre · capacidad @t.Capacidad</option> }</select></div>
+                    <div class="campo"><label for="eh">Estado</label>
+                        <select id="eh" @bind="nuevaHab.Estado"><option>DISPONIBLE</option><option>MANTENIMIENTO</option></select></div>
+                    <button class="btn primario" @onclick="CrearHabitacion" disabled="@ocupado">Crear habitación</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* =========================== HUÉSPEDES =========================== *@
+    @if (seccion == "huespedes")
+    {
+        <div class="tarjeta">
+            <div class="fila">
+                <div class="campo"><label for="bq">Buscar por documento, nombres o apellidos</label>
+                    <input id="bq" @bind="busqueda" @onkeydown="EnterBuscar" placeholder="Ej. 2020202020 o Pérez" /></div>
+                <button class="btn azul" @onclick="CargarHuespedes" disabled="@ocupado">Buscar</button>
+            </div>
+            <p class="secundario" style="margin-top:8px">Un huésped con reservas registradas no se elimina: la clave foránea FK_RESERVA_HUESPED protege la trazabilidad contable. Sus datos sí se pueden corregir.</p>
+
+            @if (huespedes == null) { <p class="secundario" style="margin-top:10px">Cargando…</p> }
+            else
+            {
+                <div class="tabla" style="margin-top:10px"><table>
+                    <tr><th>Documento</th><th>Nombres</th><th>Apellidos</th><th>Teléfono</th><th>IVA</th><th>Reservas</th><th>Acciones</th></tr>
+                    @foreach (var h in huespedes)
+                    {
+                        @if (editHueId == h.IdHuesped)
+                        {
+                            <tr>
+                                <td style="white-space:nowrap">
+                                    <select style="width:62px" @bind="editHue.TipoDocumento"><option>CC</option><option>CE</option><option>PA</option><option>TI</option></select>
+                                    <input style="width:120px" @bind="editHue.NumeroDocumento" />
+                                </td>
+                                <td><input @bind="editHue.Nombres" /></td>
+                                <td><input @bind="editHue.Apellidos" /></td>
+                                <td><input style="width:120px" @bind="editHue.Telefono" /></td>
+                                <td><input type="checkbox" @bind="editHue.ExtranjeroNoResidente" title="Extranjero no residente, exento art. 481 E.T." /></td>
+                                <td class="secundario">@h.Reservas</td>
+                                <td style="white-space:nowrap">
+                                    <button class="btn chico primario" @onclick="() => GuardarHuesped(h)" disabled="@ocupado">Guardar</button>
+                                    <button class="btn chico" @onclick="() => { editHueId = null; }">Cancelar</button>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            <tr>
+                                <td class="mono">@h.TipoDocumento @h.NumeroDocumento</td>
+                                <td>@h.Nombres</td>
+                                <td>@h.Apellidos</td>
+                                <td class="mono">@(h.Telefono ?? "—")</td>
+                                <td>@(h.ExtranjeroNoResidente ? "Exento" : "19 %")</td>
+                                <td class="secundario">@h.Reservas</td>
+                                <td style="white-space:nowrap">
+                                    @if (confirmHue == h.IdHuesped)
+                                    {
+                                        <button class="btn chico primario" @onclick="() => EliminarHuesped(h)" disabled="@ocupado">Sí, eliminar</button>
+                                        <button class="btn chico" @onclick="() => { confirmHue = null; }">No</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn chico" @onclick="() => EditarHuesped(h)">Editar</button>
+                                        <button class="btn chico" @onclick="() => { confirmHue = h.IdHuesped; }" disabled="@(h.Reservas > 0)">Eliminar</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </table></div>
+            }
+        </div>
+    }
+
+    @* ============================ RESERVAS ============================ *@
+    @if (seccion == "reservas")
+    {
+        <div class="tarjeta">
+            <h3>Reservas</h3>
+            <p class="secundario" style="margin-top:4px">Al cambiar fechas, personas o habitación se revalida la disponibilidad y la capacidad, se recalcula el precio con la tarifa vigente y queda el movimiento en la bitácora. Solo se elimina definitivamente una reserva CANCELADA o FINALIZADA.</p>
+            @if (reservas == null) { <p class="secundario" style="margin-top:10px">Cargando…</p> }
+            else
+            {
+                <div class="tabla" style="margin-top:10px"><table>
+                    <tr><th>Código</th><th>Estado</th><th>Habitación</th><th>Huésped</th><th>Fechas</th><th>Pers.</th><th>Precio neto</th><th>Acciones</th></tr>
+                    @foreach (var r in reservas)
+                    {
+                        <tr>
+                            <td class="mono"><b>@r.Codigo</b></td>
+                            <td><span class="chip @(r.Estado == "CONFIRMADA" ? "ok" : r.Estado == "EN_CASA" ? "azul" : r.Estado == "CANCELADA" ? "rojo" : "")">@r.Estado</span></td>
+                            <td>@r.Habitacion <small class="secundario">@r.Tipo</small></td>
+                            <td>@r.Huesped</td>
+                            <td class="mono">@r.FechaEntrada.ToString("yyyy-MM-dd") → @r.FechaSalida.ToString("yyyy-MM-dd")</td>
+                            <td>@r.NumeroPersonas</td>
+                            <td class="mono">@ApiClient.Moneda(r.PrecioNeto)</td>
+                            <td style="white-space:nowrap">
+                                @if (confirmRes == r.Codigo)
+                                {
+                                    <button class="btn chico primario" @onclick="() => EliminarReserva(r)" disabled="@ocupado">Sí, eliminar</button>
+                                    <button class="btn chico" @onclick="() => { confirmRes = null; }">No</button>
+                                }
+                                else
+                                {
+                                    <button class="btn chico" @onclick="() => EditarReserva(r)" disabled="@(r.Estado != "CONFIRMADA" && r.Estado != "EN_CASA")">Modificar</button>
+                                    <button class="btn chico" @onclick="() => { confirmRes = r.Codigo; }" disabled="@(r.Estado != "CANCELADA" && r.Estado != "FINALIZADA")">Eliminar</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </table></div>
+            }
+        </div>
+
+        @if (editRes != null)
+        {
+            <div class="tarjeta" style="margin-top:12px">
+                <h3>Modificar la reserva @editRes.Codigo</h3>
+                <div class="fila" style="margin-top:10px">
+                    <div class="campo"><label for="re">Entrada</label><input id="re" type="date" @bind="cambio.FechaEntrada" /></div>
+                    <div class="campo"><label for="rs">Salida</label><input id="rs" type="date" @bind="cambio.FechaSalida" /></div>
+                    <div class="campo"><label for="rp">Personas</label><input id="rp" type="number" min="1" @bind="cambio.NumeroPersonas" /></div>
+                    <div class="campo"><label for="rh">Habitación</label>
+                        <select id="rh" @bind="cambio.IdHabitacion">
+                            @foreach (var h in (habitaciones ?? new List<HabitacionAdmin>()).Where(x => x.Estado != "MANTENIMIENTO" || x.IdHabitacion == cambio.IdHabitacion))
+                            { <option value="@h.IdHabitacion">@h.Numero · @h.Tipo · @h.Capacidad p.</option> }
+                        </select></div>
+                </div>
+                <div class="campo" style="margin-top:10px"><label for="rm">Motivo del cambio (queda en la bitácora)</label>
+                    <input id="rm" @bind="cambio.Motivo" placeholder="Ej. el huésped solicitó una noche más" /></div>
+                <div style="display:flex;gap:10px;margin-top:12px">
+                    <button class="btn primario" @onclick="GuardarReserva" disabled="@ocupado">Guardar cambios</button>
+                    <button class="btn" @onclick="() => { editRes = null; }">Cerrar</button>
+                </div>
+            </div>
+        }
+    }
+}
+</RequiereSesion>
+
+@code {
+    private string seccion = "precios";
+    private string? aviso; private bool avisoError, ocupado;
+
+    private List<TipoResumen> tipos = new();
+    private List<TarifaResumen>? tarifas;
+    private NuevaTarifa nuevaTarifa = new();
+    private int? confirmTar;
+
+    private List<HabitacionAdmin>? habitaciones;
+    private DatosHabitacion nuevaHab = new();
+    private DatosHabitacion editHab = new();
+    private int? editHabId, confirmHab;
+
+    private List<HuespedAdmin>? huespedes;
+    private DatosHuesped editHue = new();
+    private int? editHueId, confirmHue;
+    private string busqueda = "";
+
+    private List<ReservaResumen>? reservas;
+    private ReservaResumen? editRes;
+    private CambioReserva cambio = new();
+    private string? confirmRes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarTodo();
+    }
+
+    private async Task CargarTodo()
+    {
+        try
+        {
+            tipos = await Api.TiposAsync();
+            if (tipos.Count > 0 && nuevaTarifa.IdTipo == 1) nuevaTarifa.IdTipo = tipos[0].IdTipo;
+            if (tipos.Count > 0) nuevaHab.IdTipo = tipos[0].IdTipo;
+            tarifas = await Api.TarifasAsync();
+            habitaciones = await Api.HabitacionesAdminAsync();
+            huespedes = await Api.HuespedesAdminAsync();
+            reservas = await Api.ReservasAsync();
+            await CargarGaleria();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+    }
+
+    private void Ok(string m) { aviso = m; avisoError = false; }
+    private void Error(string m) { aviso = m; avisoError = true; }
+
+    // ---------------- fotos del catálogo ----------------
+    /// <summary>
+    /// Sugerencias para el campo de ruta al registrar una foto. Son las imágenes
+    /// que vienen con el sistema; cualquier archivo nuevo que se copie en
+    /// wwwroot/img/habitaciones se puede escribir a mano o pegar como URL.
+    /// </summary>
+    private static readonly string[] ImagenesDisponibles =
+    {
+        "img/habitaciones/sencilla-foto.jpg",
+        "img/habitaciones/doble-foto.jpg",
+        "img/habitaciones/doble-camas.jpg",
+        "img/habitaciones/triple-foto.jpg",
+        "img/habitaciones/cuadruple-foto.jpg",
+        "img/habitaciones/bano.jpg",
+        "img/habitaciones/plano-sencilla.svg",
+        "img/habitaciones/plano-doble.svg",
+        "img/habitaciones/plano-cuadruple.jpg",
+        "img/habitaciones/portada.jpg",
+    };
+
+    private readonly Dictionary<int, List<FotoAdmin>> galeria = new();
+    private string rutaNueva = "", descripcionNueva = "";
+
+    private List<FotoAdmin> FotosDe(int idTipo) => galeria.TryGetValue(idTipo, out var l) ? l : new List<FotoAdmin>();
+
+    private async Task CargarGaleria()
+    {
+        foreach (var t in tipos)
+        {
+            try { galeria[t.IdTipo] = await Api.FotosTipoAsync(t.IdTipo); }
+            catch (ApiException) { galeria[t.IdTipo] = new List<FotoAdmin>(); }
+        }
+    }
+
+    private async Task AgregarFoto(int idTipo)
+    {
+        ocupado = true; aviso = null;
+        try
+        {
+            var r = await Api.AgregarFotoAsync(idTipo, new NuevaFoto(rutaNueva.Trim(), descripcionNueva.Trim()));
+            Ok(r.Mensaje);
+            rutaNueva = descripcionNueva = "";
+            await CargarGaleria();
+            tipos = await Api.TiposAsync();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private async Task QuitarFoto(int idTipo, FotoAdmin f)
+    {
+        ocupado = true; aviso = null;
+        try
+        {
+            var r = await Api.EliminarFotoAsync(idTipo, f.IdFoto);
+            Ok(r.Mensaje);
+            await CargarGaleria();
+            tipos = await Api.TiposAsync();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private async Task Portada(int idTipo, FotoAdmin f)
+    {
+        ocupado = true; aviso = null;
+        try
+        {
+            var r = await Api.FotoPortadaAsync(idTipo, f.IdFoto);
+            Ok(r.Mensaje);
+            await CargarGaleria();
+            tipos = await Api.TiposAsync();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private async Task GuardarTipo(TipoResumen t)
+    {
+        ocupado = true; aviso = null;
+        try
+        {
+            var r = await Api.ModificarTipoAsync(t.IdTipo, new DatosTipo(t.Descripcion, t.Imagen));
+            Ok(r.Mensaje);
+            tipos = await Api.TiposAsync();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    // ---------------- precios ----------------
+    private async Task GuardarTarifa()
+    {
+        ocupado = true; aviso = null;
+        try
+        {
+            var r = await Api.CrearTarifaAsync(nuevaTarifa);
+            Ok(r.Mensaje);
+            nuevaTarifa = new NuevaTarifa { IdTipo = nuevaTarifa.IdTipo };
+            tipos = await Api.TiposAsync();
+            tarifas = await Api.TarifasAsync();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private async Task EliminarTarifa(TarifaResumen t)
+    {
+        ocupado = true; aviso = null; confirmTar = null;
+        try
+        {
+            var r = await Api.EliminarTarifaAsync(t.IdTarifa);
+            Ok(r.Mensaje);
+            tipos = await Api.TiposAsync();
+            tarifas = await Api.TarifasAsync();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    // ---------------- habitaciones ----------------
+    private void EditarHabitacion(HabitacionAdmin h)
+    {
+        editHabId = h.IdHabitacion; confirmHab = null;
+        editHab = new DatosHabitacion { Numero = h.Numero, Piso = h.Piso, IdTipo = h.IdTipo, Estado = h.Estado };
+    }
+
+    private async Task GuardarHabitacion(HabitacionAdmin h)
+    {
+        ocupado = true; aviso = null;
+        try
+        {
+            var r = await Api.ModificarHabitacionAsync(h.IdHabitacion, editHab);
+            Ok(r.Mensaje); editHabId = null;
+            habitaciones = await Api.HabitacionesAdminAsync();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private async Task CrearHabitacion()
+    {
+        ocupado = true; aviso = null;
+        try
+        {
+            var r = await Api.CrearHabitacionAsync(nuevaHab);
+            Ok(r.Mensaje);
+            nuevaHab = new DatosHabitacion { IdTipo = nuevaHab.IdTipo, Piso = nuevaHab.Piso };
+            habitaciones = await Api.HabitacionesAdminAsync();
+            tipos = await Api.TiposAsync();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private async Task EliminarHabitacion(HabitacionAdmin h)
+    {
+        ocupado = true; aviso = null; confirmHab = null;
+        try
+        {
+            var r = await Api.EliminarHabitacionAsync(h.IdHabitacion);
+            Ok(r.Mensaje);
+            habitaciones = await Api.HabitacionesAdminAsync();
+            tipos = await Api.TiposAsync();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    // ---------------- huéspedes ----------------
+    private Task EnterBuscar(KeyboardEventArgs e) => e.Key == "Enter" ? CargarHuespedes() : Task.CompletedTask;
+
+    private async Task CargarHuespedes()
+    {
+        ocupado = true; aviso = null;
+        try { huespedes = await Api.HuespedesAdminAsync(busqueda); }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private void EditarHuesped(HuespedAdmin h)
+    {
+        editHueId = h.IdHuesped; confirmHue = null;
+        editHue = new DatosHuesped
+        {
+            TipoDocumento = h.TipoDocumento, NumeroDocumento = h.NumeroDocumento, Nombres = h.Nombres,
+            Apellidos = h.Apellidos, Telefono = h.Telefono, Correo = h.Correo, ExtranjeroNoResidente = h.ExtranjeroNoResidente,
+        };
+    }
+
+    private async Task GuardarHuesped(HuespedAdmin h)
+    {
+        ocupado = true; aviso = null;
+        try
+        {
+            var r = await Api.ModificarHuespedAsync(h.IdHuesped, editHue);
+            Ok(r.Mensaje); editHueId = null;
+            huespedes = await Api.HuespedesAdminAsync(busqueda);
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private async Task EliminarHuesped(HuespedAdmin h)
+    {
+        ocupado = true; aviso = null; confirmHue = null;
+        try
+        {
+            var r = await Api.EliminarHuespedAsync(h.IdHuesped);
+            Ok(r.Mensaje);
+            huespedes = await Api.HuespedesAdminAsync(busqueda);
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    // ---------------- reservas ----------------
+    private void EditarReserva(ReservaResumen r)
+    {
+        editRes = r; confirmRes = null; aviso = null;
+        var hab = (habitaciones ?? new List<HabitacionAdmin>()).FirstOrDefault(x => x.Numero == r.Habitacion);
+        cambio = new CambioReserva
+        {
+            FechaEntrada = r.FechaEntrada, FechaSalida = r.FechaSalida, NumeroPersonas = r.NumeroPersonas,
+            IdHabitacion = hab?.IdHabitacion ?? (habitaciones ?? new List<HabitacionAdmin>()).Select(x => x.IdHabitacion).FirstOrDefault(),
+            VersionFila = r.VersionFila, Motivo = "",
+        };
+    }
+
+    private async Task GuardarReserva()
+    {
+        if (editRes == null) return;
+        ocupado = true; aviso = null;
+        try
+        {
+            var r = await Api.ModificarReservaAsync(editRes.Codigo, cambio);
+            Ok(r.Mensaje); editRes = null;
+            reservas = await Api.ReservasAsync();
+            habitaciones = await Api.HabitacionesAdminAsync();
+        }
+        catch (ApiException ex)
+        {
+            Error(ex.Message);
+            reservas = await Api.ReservasAsync();
+            await CargarGaleria();
+        }
+        finally { ocupado = false; }
+    }
+
+    private async Task EliminarReserva(ReservaResumen r)
+    {
+        ocupado = true; aviso = null; confirmRes = null;
+        try
+        {
+            var res = await Api.EliminarReservaAsync(r.Codigo);
+            Ok(res.Mensaje);
+            reservas = await Api.ReservasAsync();
+            habitaciones = await Api.HabitacionesAdminAsync();
+        }
+        catch (ApiException ex) { Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+}

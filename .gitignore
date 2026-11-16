@@ -1,0 +1,24 @@
+## Salidas de compilación de .NET
+bin/
+obj/
+.vs/
+publish/
+*.user
+*.suo
+
+## Configuración local que no debe publicarse
+.env
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.Local.json
+
+## Resultados de las pruebas
+evidencias.json
+TestResults/
+
+## Editores y sistema operativo
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

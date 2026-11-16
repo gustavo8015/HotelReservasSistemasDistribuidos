@@ -1,0 +1,87 @@
+@page "/huespedes"
+@inject ApiClient Api
+
+<PageTitle>Huéspedes · Hotel Reservas</PageTitle>
+
+<div class="encabezado"><h2>Huéspedes</h2><span class="chip">CU-02 · RF02 · RF18</span>
+    <span class="sub">Registro y consulta de los huéspedes del hotel; reconocimiento del huésped frecuente por su documento.</span></div>
+
+<RequiereSesion>
+<div class="grid g2">
+    <div class="tarjeta">
+        <h3>Buscar por documento</h3>
+        <div class="fila" style="margin-top:10px">
+            <div class="campo"><label for="doc">Documento</label><input id="doc" @bind="documento" @onkeydown="Enter" placeholder="Ej. 2020202020" /></div>
+            <button class="btn azul" @onclick="Buscar" disabled="@ocupado">Buscar</button>
+        </div>
+        @if (errorB != null) { <div class="nota error" style="margin-top:10px">@errorB</div> }
+        @if (perfil != null)
+        {
+            <div class="tarjeta" style="margin-top:12px;background:#EDF1F6">
+                <b style="font-size:16px">@perfil.NombreCompleto</b> @if (perfil.EsFrecuente) { <span class="chip ok">Huésped frecuente</span> }
+                <table style="margin-top:8px">
+                    <tr><td class="secundario">Documento</td><td class="mono">@perfil.TipoDocumento @perfil.NumeroDocumento</td></tr>
+                    <tr><td class="secundario">Teléfono (WhatsApp)</td><td class="mono">@(perfil.Telefono ?? "—")</td></tr>
+                    <tr><td class="secundario">Estadías</td><td>@perfil.Estadias</td></tr>
+                    <tr><td class="secundario">IVA alojamiento</td><td>@(perfil.ExtranjeroNoResidente ? "Exento (extranjero no residente)" : "19 %")</td></tr>
+                    @if (perfil.UltimaEstadia != null) { <tr><td class="secundario">Última estadía</td><td>Hab. @perfil.UltimaEstadia.Habitacion @perfil.UltimaEstadia.Tipo · @perfil.UltimaEstadia.Noches noche(s) · @perfil.UltimaEstadia.Personas pers. · @perfil.UltimaEstadia.MedioPago · @perfil.UltimaEstadia.Fecha.ToString("yyyy-MM-dd")</td></tr> }
+                </table>
+            </div>
+        }
+    </div>
+    <div class="tarjeta">
+        <h3>Registrar huésped (CU-02)</h3>
+        <EditForm Model="nuevo" OnValidSubmit="Guardar" style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+            <div class="fila">
+                <div class="campo" style="flex:0 1 110px"><label>Tipo</label><InputSelect @bind-Value="nuevo.TipoDocumento"><option>CC</option><option>CE</option><option>PA</option><option>TI</option></InputSelect></div>
+                <div class="campo"><label>Documento</label><InputText @bind-Value="nuevo.NumeroDocumento" /></div>
+            </div>
+            <div class="fila">
+                <div class="campo"><label>Nombres</label><InputText @bind-Value="nuevo.Nombres" /></div>
+                <div class="campo"><label>Apellidos</label><InputText @bind-Value="nuevo.Apellidos" /></div>
+            </div>
+            <div class="fila">
+                <div class="campo"><label>Teléfono (WhatsApp)</label><InputText @bind-Value="nuevo.Telefono" placeholder="3001234567" /></div>
+                <div class="campo"><label>Correo</label><InputText @bind-Value="nuevo.Correo" /></div>
+            </div>
+            <label class="check"><InputCheckbox @bind-Value="nuevo.ExtranjeroNoResidente" /><span><b>Extranjero no residente</b><small>Exento de IVA en alojamiento (art. 481 E.T.)</small></span></label>
+            <button class="btn primario" type="submit" disabled="@ocupado">Guardar huésped</button>
+            @if (msg != null) { <div class="nota @(msgError ? "error" : "ok")">@msg</div> }
+        </EditForm>
+    </div>
+</div>
+</RequiereSesion>
+
+@code {
+    private string documento = ""; private HuespedPerfil? perfil; private string? errorB;
+    private NuevoHuesped nuevo = new(); private string? msg; private bool msgError, ocupado;
+
+    private Task Enter(KeyboardEventArgs e) => e.Key == "Enter" ? Buscar() : Task.CompletedTask;
+
+    private async Task Buscar()
+    {
+        errorB = null; perfil = null; var d = documento.Trim();
+        if (d.Length == 0) { errorB = "Digite el número de documento."; return; }
+        ocupado = true;
+        try { perfil = await Api.HuespedPorDocumentoAsync(d); }
+        catch (ApiException ex) { errorB = ex.Estado == System.Net.HttpStatusCode.NotFound ? "Documento no registrado." : ex.Message; }
+        finally { ocupado = false; }
+    }
+
+    private async Task Guardar()
+    {
+        msg = null; msgError = false;
+        if (string.IsNullOrWhiteSpace(nuevo.NumeroDocumento) || string.IsNullOrWhiteSpace(nuevo.Nombres) || string.IsNullOrWhiteSpace(nuevo.Apellidos))
+        { msg = "Documento, nombres y apellidos son obligatorios."; msgError = true; return; }
+        ocupado = true;
+        try
+        {
+            await Api.CrearHuespedAsync(nuevo);
+            msg = $"Huésped {nuevo.Nombres} {nuevo.Apellidos} registrado.";
+            documento = nuevo.NumeroDocumento; nuevo = new();
+            await Buscar();
+        }
+        catch (ApiException ex) { msg = ex.Estado == System.Net.HttpStatusCode.Conflict ? "Ya existe un huésped con ese documento (UQ_HUESPED_documento)." : ex.Message; msgError = true; }
+        finally { ocupado = false; }
+    }
+}
